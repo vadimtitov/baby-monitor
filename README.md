@@ -1,6 +1,6 @@
 # Baby Sleep Tracker
 
-A simple, mobile-friendly baby sleep tracking application with Docker deployment and optional Home Assistant integration.
+A simple, mobile-friendly baby sleep tracking application. Designed for one-click deployment via Portainer.
 
 ## Features
 
@@ -11,40 +11,40 @@ A simple, mobile-friendly baby sleep tracking application with Docker deployment
 - **Timezone support** - Switch between London, Barcelona, and Moscow
 - **Home Assistant** - Optional event push on state changes
 - **Mobile-ready** - Add to iPhone home screen as a web app
+- **Auto-migration** - Database tables and indexes are created automatically on first start
 
-## Architecture
+## Deploy via Portainer
 
-| Container | Image | Port |
-|-----------|-------|------|
-| Frontend | Nginx Alpine | 3000 |
-| Backend | Node 18 Alpine | 3001 |
-| Database | PostgreSQL 16 Alpine | 5432 (internal) |
+1. In Portainer, go to **Stacks** > **Add stack**
+2. Select **Repository**
+3. Enter repository URL and branch
+4. Set **Compose path**: `docker-compose.yml`
+5. Under **Environment variables**, add:
 
-## Quick Start
+   | Variable | Required | Example |
+   |----------|----------|---------|
+   | `DB_URI` | Yes | `postgresql://user:pass@192.168.50.135:5432/baby_sleep` |
+   | `HA_URL` | No | `http://homeassistant.local:8123` |
+   | `HA_TOKEN` | No | your HA long-lived access token |
+   | `PORT` | No | `3000` (default) |
 
-### 1. Clone and configure
+6. Click **Deploy the stack**
+
+That's it. The backend will automatically create the database table, indexes, and triggers on first startup.
+
+The app will be available at `http://your-server-ip:3000`.
+
+## Deploy via CLI
 
 ```bash
 git clone https://github.com/your-user/baby-monitor.git
 cd baby-monitor
 cp .env.example .env
+# Edit .env — set DB_URI at minimum
+docker compose up -d
 ```
 
-Edit `.env` and set a strong password:
-
-```
-DB_PASSWORD=your_strong_password_here
-```
-
-### 2. Start the stack
-
-```bash
-docker-compose up -d
-```
-
-The app will be available at `http://localhost:3000`.
-
-### 3. Add to iPhone home screen
+## Add to iPhone Home Screen
 
 1. Open Safari on your iPhone
 2. Navigate to `http://your-server-ip:3000`
@@ -52,66 +52,18 @@ The app will be available at `http://localhost:3000`.
 4. Select "Add to Home Screen"
 5. Name it "Baby Sleep" and tap Add
 
-## Deploy via Portainer
-
-1. In Portainer, go to **Stacks** > **Add stack**
-2. Select **Repository**
-3. Enter repository URL: `https://github.com/your-user/baby-monitor.git`
-4. Set **Compose path**: `docker-compose.yml`
-5. Under **Environment variables**, add:
-   - `DB_PASSWORD` = your strong password
-   - `HA_URL` = your Home Assistant URL (optional)
-   - `HA_TOKEN` = your HA access token (optional)
-6. Click **Deploy the stack**
-
-## Using an Existing PostgreSQL Instance
-
-To use an external PostgreSQL database instead of the bundled container:
-
-1. Run the schema on your existing database:
-   ```bash
-   psql -h your-db-host -U your-user -d your-db -f database/schema.sql
-   ```
-
-2. Modify `docker-compose.yml`:
-   - Remove the `postgres` service
-   - Remove the `postgres_data` volume
-   - Remove `depends_on: postgres` from the backend service
-   - Update backend environment variables:
-     ```yaml
-     environment:
-       DB_HOST: your-db-host
-       DB_PORT: 5432
-       DB_NAME: your-db-name
-       DB_USER: your-user
-       DB_PASSWORD: ${DB_PASSWORD}
-     ```
-
 ## Environment Variables
 
-### Backend
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | `postgres` | Database hostname |
-| `DB_PORT` | `5432` | Database port |
-| `DB_NAME` | `baby_sleep` | Database name |
-| `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | *(required)* | Database password |
-| `PORT` | `3001` | API server port |
-| `HA_URL` | *(optional)* | Home Assistant URL |
-| `HA_TOKEN` | *(optional)* | Home Assistant access token |
-
-### Docker Compose
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FRONTEND_PORT` | `3000` | Host port for frontend |
-| `BACKEND_PORT` | `3001` | Host port for backend |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DB_URI` | Yes | — | PostgreSQL connection string |
+| `PORT` | No | `3000` | Port the app is exposed on |
+| `HA_URL` | No | — | Home Assistant URL |
+| `HA_TOKEN` | No | — | Home Assistant access token |
 
 ## Home Assistant Integration
 
-When `HA_URL` and `HA_TOKEN` are set, the backend sends events on every sleep state change:
+When `HA_URL` and `HA_TOKEN` are set, the backend fires an event on every sleep state change:
 
 **Endpoint:** `POST {HA_URL}/api/events/baby_sleep_state_changed`
 
@@ -129,7 +81,7 @@ To create a long-lived access token in Home Assistant:
 2. Scroll to "Long-Lived Access Tokens"
 3. Click "Create Token"
 
-The app works without Home Assistant configured.
+The app works fine without Home Assistant configured.
 
 ## API Endpoints
 
@@ -145,62 +97,40 @@ The app works without Home Assistant configured.
 
 ## Backup and Restore
 
-### Backup
-
 ```bash
-# Backup the database
-docker-compose exec postgres pg_dump -U postgres baby_sleep > backup.sql
-```
-
-### Restore
-
-```bash
-# Restore from backup
-docker-compose exec -T postgres psql -U postgres baby_sleep < backup.sql
-```
-
-### Full data directory backup
-
-```bash
-# Stop the stack first
-docker-compose down
-
-# Backup the volume
-docker run --rm -v baby-monitor_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/db-backup.tar.gz /data
+# Backup
+pg_dump "your_db_uri" > backup.sql
 
 # Restore
-docker run --rm -v baby-monitor_postgres_data:/data -v $(pwd):/backup alpine tar xzf /backup/db-backup.tar.gz -C /
+psql "your_db_uri" < backup.sql
 ```
 
 ## Troubleshooting
 
-### Containers won't start
-```bash
-# Check logs
-docker-compose logs
-
-# Check specific service
-docker-compose logs backend
-```
-
-### Database connection errors
-- Verify `DB_PASSWORD` is set in `.env`
-- Check that the postgres container is healthy: `docker-compose ps`
-- Wait for the health check to pass before the backend connects
+### Backend can't connect to database
+- Verify `DB_URI` is correct and the database host is reachable from Docker
+- Check backend logs: click the backend container in Portainer > Logs
+- The backend retries connection for up to 60 seconds on startup
 
 ### Frontend shows "Loading..." forever
-- Check backend logs: `docker-compose logs backend`
-- Verify the backend container is running: `docker-compose ps`
-- Check nginx config proxies `/api/` to the backend correctly
+- The backend might still be starting — wait a moment and refresh
+- Check backend container logs for errors
 
 ### Charts not displaying
-- Charts only appear when there are completed sleep sessions
-- Ensure sessions have both start and end times
+- Charts only appear after you have completed sleep sessions (start + stop)
 
 ### Home Assistant events not received
-- Verify `HA_URL` is reachable from the Docker network
+- Verify `HA_URL` is reachable from within Docker (not `localhost`)
 - Check that `HA_TOKEN` is a valid long-lived access token
 - Check backend logs for error messages
+
+## Architecture
+
+```
+browser → nginx (port 3000) → node backend (port 3001) → your PostgreSQL
+```
+
+Two containers: frontend (nginx) and backend (node). Database is external (yours).
 
 ## Project Structure
 
@@ -211,7 +141,7 @@ baby-monitor/
 ├── .env.example
 ├── .gitignore
 ├── database/
-│   └── schema.sql
+│   └── schema.sql          # Reference only — backend auto-migrates
 ├── backend/
 │   ├── Dockerfile
 │   ├── package.json

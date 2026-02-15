@@ -7,14 +7,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Database configuration
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'baby_sleep',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
-});
+// Database configuration — accepts DB_URI or falls back to individual vars
+const pool = process.env.DB_URI
+  ? new Pool({ connectionString: process.env.DB_URI })
+  : new Pool({
+      host: process.env.DB_HOST || 'postgres',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'baby_sleep',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+    });
 
 // Home Assistant configuration
 const HA_URL = process.env.HA_URL;
@@ -41,6 +43,42 @@ async function notifyHomeAssistant(state, timestamp, sessionId) {
   } catch (err) {
     console.error('Failed to notify Home Assistant:', err.message);
   }
+}
+
+// Auto-migrate: create table, indexes, trigger on startup
+async function migrate() {
+  console.log('Running database migration...');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sleep_sessions (
+      id SERIAL PRIMARY KEY,
+      start_time TIMESTAMPTZ NOT NULL,
+      end_time TIMESTAMPTZ,
+      duration_minutes INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start_time ON sleep_sessions (start_time);
+    CREATE INDEX IF NOT EXISTS idx_sleep_sessions_end_time ON sleep_sessions (end_time);
+
+    CREATE OR REPLACE FUNCTION calculate_duration()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      IF NEW.end_time IS NOT NULL AND NEW.start_time IS NOT NULL THEN
+        NEW.duration_minutes := EXTRACT(EPOCH FROM (NEW.end_time - NEW.start_time)) / 60;
+      END IF;
+      NEW.updated_at := NOW();
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_calculate_duration ON sleep_sessions;
+    CREATE TRIGGER trg_calculate_duration
+      BEFORE INSERT OR UPDATE ON sleep_sessions
+      FOR EACH ROW
+      EXECUTE FUNCTION calculate_duration();
+  `);
+  console.log('Database migration complete');
 }
 
 // Wait for database to be ready
@@ -269,16 +307,19 @@ app.delete('/api/sleep/sessions/:id', async (req, res) => {
 // Start server
 const PORT = parseInt(process.env.PORT || '3001');
 
-waitForDb().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Baby Sleep Tracker API running on port ${PORT}`);
-    if (HA_URL) {
-      console.log(`Home Assistant integration enabled: ${HA_URL}`);
-    } else {
-      console.log('Home Assistant integration not configured');
-    }
+waitForDb()
+  .then(() => migrate())
+  .then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Baby Sleep Tracker API running on port ${PORT}`);
+      if (HA_URL) {
+        console.log(`Home Assistant integration enabled: ${HA_URL}`);
+      } else {
+        console.log('Home Assistant integration not configured');
+      }
+    });
+  })
+  .catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
