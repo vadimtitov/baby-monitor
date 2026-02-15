@@ -18,13 +18,15 @@ const pool = process.env.DB_URI
       password: process.env.DB_PASSWORD,
     });
 
+// Night starts at this UTC hour (sessions before 07:00 or >= NIGHT_START_HOUR are "night")
+const NIGHT_START_HOUR = parseInt(process.env.NIGHT_START_HOUR || '19');
+
 // Home Assistant configuration
 const HA_URL = process.env.HA_URL;
 const HA_TOKEN = process.env.HA_TOKEN;
 
 async function notifyHomeAssistant(state, timestamp, sessionId) {
   if (!HA_URL || !HA_TOKEN) return;
-
   try {
     const url = `${HA_URL.replace(/\/+$/, '')}/api/events/baby_sleep_state_changed`;
     await fetch(url, {
@@ -33,11 +35,7 @@ async function notifyHomeAssistant(state, timestamp, sessionId) {
         'Authorization': `Bearer ${HA_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        state,
-        timestamp,
-        session_id: sessionId,
-      }),
+      body: JSON.stringify({ state, timestamp, session_id: sessionId }),
     });
     console.log(`Home Assistant notified: ${state}`);
   } catch (err) {
@@ -122,20 +120,15 @@ app.get('/api/sleep/current', async (req, res) => {
 // Start new sleep session
 app.post('/api/sleep/start', async (req, res) => {
   try {
-    // Check if there's already an active session
-    const active = await pool.query(
-      'SELECT id FROM sleep_sessions WHERE end_time IS NULL'
-    );
+    const active = await pool.query('SELECT id FROM sleep_sessions WHERE end_time IS NULL');
     if (active.rows.length > 0) {
       return res.status(409).json({ error: 'A sleep session is already active' });
     }
-
     const now = new Date().toISOString();
     const result = await pool.query(
       'INSERT INTO sleep_sessions (start_time) VALUES ($1) RETURNING *',
       [now]
     );
-
     const session = result.rows[0];
     await notifyHomeAssistant('sleeping', now, session.id);
     res.status(201).json(session);
@@ -151,17 +144,14 @@ app.post('/api/sleep/end', async (req, res) => {
     const active = await pool.query(
       'SELECT * FROM sleep_sessions WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1'
     );
-
     if (active.rows.length === 0) {
       return res.status(404).json({ error: 'No active sleep session found' });
     }
-
     const now = new Date().toISOString();
     const result = await pool.query(
       'UPDATE sleep_sessions SET end_time = $1 WHERE id = $2 RETURNING *',
       [now, active.rows[0].id]
     );
-
     const session = result.rows[0];
     await notifyHomeAssistant('awake', now, session.id);
     res.json(session);
@@ -178,23 +168,10 @@ app.get('/api/sleep/sessions', async (req, res) => {
     let query = 'SELECT * FROM sleep_sessions WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-
-    if (start_date) {
-      query += ` AND start_time >= $${paramIndex++}`;
-      params.push(start_date);
-    }
-    if (end_date) {
-      query += ` AND start_time <= $${paramIndex++}`;
-      params.push(end_date);
-    }
-
+    if (start_date) { query += ` AND start_time >= $${paramIndex++}`; params.push(start_date); }
+    if (end_date) { query += ` AND start_time <= $${paramIndex++}`; params.push(end_date); }
     query += ' ORDER BY start_time DESC';
-
-    if (limit) {
-      query += ` LIMIT $${paramIndex++}`;
-      params.push(parseInt(limit));
-    }
-
+    if (limit) { query += ` LIMIT $${paramIndex++}`; params.push(parseInt(limit)); }
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -203,84 +180,92 @@ app.get('/api/sleep/sessions', async (req, res) => {
   }
 });
 
-// Get aggregated stats
-app.get('/api/sleep/stats', async (req, res) => {
+// Today stats — anchored to morning wake-up (last sleep end between 04:00–12:00 UTC today)
+app.get('/api/sleep/stats/today', async (req, res) => {
   try {
-    const { start_date, end_date } = req.query;
-    let dateFilter = '';
-    const params = [];
-    let paramIndex = 1;
+    const wakeUpResult = await pool.query(`
+      SELECT end_time FROM sleep_sessions
+      WHERE end_time IS NOT NULL
+        AND end_time >= CURRENT_DATE + INTERVAL '4 hours'
+        AND end_time <  CURRENT_DATE + INTERVAL '12 hours'
+      ORDER BY end_time DESC
+      LIMIT 1
+    `);
 
-    if (start_date) {
-      dateFilter += ` AND start_time >= $${paramIndex++}`;
-      params.push(start_date);
+    if (wakeUpResult.rows.length === 0) {
+      return res.json({ woke_up: null, day_sleep_minutes: 0, awake_minutes: 0, naps: 0 });
     }
-    if (end_date) {
-      dateFilter += ` AND start_time <= $${paramIndex++}`;
-      params.push(end_date);
-    }
 
-    // Overall stats (only completed sessions)
-    const overallQuery = `
-      SELECT
-        COUNT(*) as total_sessions,
-        COALESCE(SUM(duration_minutes), 0) as total_minutes,
-        COALESCE(AVG(duration_minutes), 0) as avg_minutes,
-        COALESCE(MAX(duration_minutes), 0) as max_minutes
-      FROM sleep_sessions
-      WHERE end_time IS NOT NULL ${dateFilter}
-    `;
-    const overall = await pool.query(overallQuery, params);
+    const wakeUpTime = wakeUpResult.rows[0].end_time;
 
-    // Daily stats (last 30 days)
-    const dailyQuery = `
+    const napsResult = await pool.query(`
       SELECT
-        DATE(start_time AT TIME ZONE 'UTC') as date,
-        COUNT(*) as sessions,
-        COALESCE(SUM(duration_minutes), 0) as total_minutes
+        COUNT(*) as naps,
+        COALESCE(SUM(duration_minutes), 0) as day_sleep_minutes
       FROM sleep_sessions
       WHERE end_time IS NOT NULL
-        AND start_time >= NOW() - INTERVAL '30 days'
-        ${dateFilter}
-      GROUP BY DATE(start_time AT TIME ZONE 'UTC')
-      ORDER BY date
-    `;
-    const daily = await pool.query(dailyQuery, params);
+        AND start_time > $1
+    `, [wakeUpTime]);
 
-    // Hourly distribution
-    const hourlyQuery = `
+    const daySleptMinutes = Math.round(parseFloat(napsResult.rows[0].day_sleep_minutes));
+    const naps = parseInt(napsResult.rows[0].naps);
+    const awakeMinutes = Math.max(
+      0,
+      Math.round((Date.now() - new Date(wakeUpTime).getTime()) / 60000) - daySleptMinutes
+    );
+
+    res.json({ woke_up: wakeUpTime, day_sleep_minutes: daySleptMinutes, awake_minutes: awakeMinutes, naps });
+  } catch (err) {
+    console.error('Error getting today stats:', err);
+    res.status(500).json({ error: 'Failed to get today stats' });
+  }
+});
+
+// Weekly stats — last 7 days, split by day/night
+app.get('/api/sleep/stats/weekly', async (req, res) => {
+  try {
+    const result = await pool.query(`
       SELECT
-        EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') as hour,
-        COUNT(*) as sessions,
-        COALESCE(AVG(duration_minutes), 0) as avg_minutes
+        DATE(start_time AT TIME ZONE 'UTC') as day,
+        COALESCE(SUM(duration_minutes), 0) as total_minutes,
+        COALESCE(SUM(CASE
+          WHEN EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') >= $1
+            OR EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') < 7
+          THEN duration_minutes ELSE 0 END), 0) as night_minutes,
+        COALESCE(SUM(CASE
+          WHEN EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') >= 7
+           AND EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') < $1
+          THEN duration_minutes ELSE 0 END), 0) as day_minutes,
+        COUNT(CASE
+          WHEN EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') >= 7
+           AND EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') < $1
+          THEN 1 END) as nap_count
       FROM sleep_sessions
-      WHERE end_time IS NOT NULL ${dateFilter}
-      GROUP BY EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC')
-      ORDER BY hour
-    `;
-    const hourly = await pool.query(hourlyQuery, params);
+      WHERE end_time IS NOT NULL
+        AND start_time >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(start_time AT TIME ZONE 'UTC')
+      ORDER BY day
+    `, [NIGHT_START_HOUR]);
+
+    const days = result.rows;
+    const n = Math.max(days.length, 1);
 
     res.json({
-      overall: {
-        total_sessions: parseInt(overall.rows[0].total_sessions),
-        total_minutes: Math.round(parseFloat(overall.rows[0].total_minutes)),
-        avg_minutes: Math.round(parseFloat(overall.rows[0].avg_minutes)),
-        max_minutes: Math.round(parseFloat(overall.rows[0].max_minutes)),
+      averages: {
+        total_minutes: Math.round(days.reduce((s, d) => s + parseFloat(d.total_minutes), 0) / n),
+        night_minutes: Math.round(days.reduce((s, d) => s + parseFloat(d.night_minutes), 0) / n),
+        day_minutes:   Math.round(days.reduce((s, d) => s + parseFloat(d.day_minutes),   0) / n),
+        naps: Math.round(days.reduce((s, d) => s + parseInt(d.nap_count), 0) / n * 10) / 10,
       },
-      daily: daily.rows.map(r => ({
-        date: r.date,
-        sessions: parseInt(r.sessions),
-        total_minutes: Math.round(parseFloat(r.total_minutes)),
-      })),
-      hourly: hourly.rows.map(r => ({
-        hour: parseInt(r.hour),
-        sessions: parseInt(r.sessions),
-        avg_minutes: Math.round(parseFloat(r.avg_minutes)),
+      daily: days.map(d => ({
+        date: d.day,
+        night_minutes: Math.round(parseFloat(d.night_minutes)),
+        day_minutes:   Math.round(parseFloat(d.day_minutes)),
       })),
     });
   } catch (err) {
-    console.error('Error getting stats:', err);
-    res.status(500).json({ error: 'Failed to get stats' });
+    console.error('Error getting weekly stats:', err);
+    res.status(500).json({ error: 'Failed to get weekly stats' });
   }
 });
 
@@ -292,11 +277,9 @@ app.delete('/api/sleep/sessions/:id', async (req, res) => {
       'DELETE FROM sleep_sessions WHERE id = $1 RETURNING *',
       [id]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
     }
-
     res.json({ message: 'Session deleted', session: result.rows[0] });
   } catch (err) {
     console.error('Error deleting session:', err);
@@ -312,6 +295,7 @@ waitForDb()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Baby Sleep Tracker API running on port ${PORT}`);
+      console.log(`Night/day boundary: ${NIGHT_START_HOUR}:00 UTC`);
       if (HA_URL) {
         console.log(`Home Assistant integration enabled: ${HA_URL}`);
       } else {

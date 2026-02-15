@@ -126,17 +126,34 @@
             text-align: center;
             font-size: 36px;
             font-weight: 300;
-            color: #a29bfe;
             margin-bottom: 32px;
             min-height: 44px;
             font-variant-numeric: tabular-nums;
+        }
+
+        .timer.sleeping { color: #a29bfe; }
+        .timer.awake    { color: #fd79a8; }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 12px;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #1a1a2e;
+            margin: 4px 0 24px;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
 
         .stat-card {
@@ -167,14 +184,6 @@
             margin-bottom: 24px;
         }
 
-        .chart-container h3 {
-            font-size: 14px;
-            color: #888;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
         .chart-wrapper {
             position: relative;
             height: 200px;
@@ -185,10 +194,11 @@
         }
 
         .sessions-list h3 {
-            font-size: 14px;
-            color: #888;
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1.2px;
             margin-bottom: 12px;
         }
 
@@ -301,6 +311,16 @@
             }).format(date);
         }
 
+        function formatShortTimeInTz(dateStr, tz) {
+            if (!dateStr) return '--';
+            return new Intl.DateTimeFormat('en-GB', {
+                timeZone: tz,
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }).format(new Date(dateStr));
+        }
+
         function formatDateTimeInTz(dateStr, tz) {
             const d = new Date(dateStr);
             return new Intl.DateTimeFormat('en-GB', {
@@ -329,11 +349,13 @@
             const [timezone, setTimezone] = useState(TIMEZONES[0]);
             const [currentTime, setCurrentTime] = useState(new Date());
             const [currentSession, setCurrentSession] = useState(null);
-            const [stats, setStats] = useState(null);
+            const [todayStats, setTodayStats] = useState(null);
+            const [weeklyStats, setWeeklyStats] = useState(null);
             const [sessions, setSessions] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [timerMs, setTimerMs] = useState(0);
+            const [awakeTimerMs, setAwakeTimerMs] = useState(0);
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
@@ -343,12 +365,9 @@
                 return () => clearInterval(interval);
             }, []);
 
-            // Timer tick
+            // Sleep timer
             useEffect(() => {
-                if (!currentSession) {
-                    setTimerMs(0);
-                    return;
-                }
+                if (!currentSession) { setTimerMs(0); return; }
                 const startTime = new Date(currentSession.start_time).getTime();
                 const update = () => setTimerMs(Date.now() - startTime);
                 update();
@@ -356,15 +375,31 @@
                 return () => clearInterval(interval);
             }, [currentSession]);
 
+            // Awake timer — time since last session ended
+            const lastEndTime = !currentSession && sessions.length > 0
+                ? ((sessions.find(s => s.end_time) || {}).end_time || null)
+                : null;
+
+            useEffect(() => {
+                if (!lastEndTime) { setAwakeTimerMs(0); return; }
+                const endTime = new Date(lastEndTime).getTime();
+                const update = () => setAwakeTimerMs(Date.now() - endTime);
+                update();
+                const interval = setInterval(update, 1000);
+                return () => clearInterval(interval);
+            }, [lastEndTime]);
+
             const loadData = useCallback(async () => {
                 try {
-                    const [session, statsData, sessionsData] = await Promise.all([
+                    const [session, today, weekly, sessionsData] = await Promise.all([
                         apiFetch('/sleep/current'),
-                        apiFetch('/sleep/stats'),
+                        apiFetch('/sleep/stats/today'),
+                        apiFetch('/sleep/stats/weekly'),
                         apiFetch('/sleep/sessions?limit=20'),
                     ]);
                     setCurrentSession(session);
-                    setStats(statsData);
+                    setTodayStats(today);
+                    setWeeklyStats(weekly);
                     setSessions(sessionsData);
                     setError(null);
                 } catch (err) {
@@ -378,60 +413,65 @@
                 loadData();
             }, [loadData]);
 
-            // Chart
+            // Stacked bar chart (night vs day, last 7 days)
             useEffect(() => {
-                if (!stats || !stats.daily || !chartRef.current) return;
-
-                if (chartInstance.current) {
-                    chartInstance.current.destroy();
-                }
+                if (!weeklyStats || !weeklyStats.daily || !chartRef.current) return;
+                if (chartInstance.current) { chartInstance.current.destroy(); }
 
                 const ctx = chartRef.current.getContext('2d');
-                const dailyData = stats.daily;
+                const days = weeklyStats.daily;
 
                 chartInstance.current = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: dailyData.map(d => {
+                        labels: days.map(d => {
                             const date = new Date(d.date);
-                            return new Intl.DateTimeFormat('en-GB', {
-                                month: 'short',
-                                day: 'numeric',
-                            }).format(date);
+                            return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric' }).format(date);
                         }),
-                        datasets: [{
-                            label: 'Sleep (hours)',
-                            data: dailyData.map(d => (d.total_minutes / 60).toFixed(1)),
-                            backgroundColor: 'rgba(108, 92, 231, 0.6)',
-                            borderColor: 'rgba(108, 92, 231, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                        }],
+                        datasets: [
+                            {
+                                label: 'Night',
+                                data: days.map(d => +(d.night_minutes / 60).toFixed(1)),
+                                backgroundColor: 'rgba(108, 92, 231, 0.75)',
+                                borderColor: 'rgba(108, 92, 231, 1)',
+                                borderWidth: 1,
+                                borderRadius: 3,
+                            },
+                            {
+                                label: 'Day',
+                                data: days.map(d => +(d.day_minutes / 60).toFixed(1)),
+                                backgroundColor: 'rgba(232, 67, 147, 0.75)',
+                                borderColor: 'rgba(232, 67, 147, 1)',
+                                borderWidth: 1,
+                                borderRadius: 3,
+                            },
+                        ],
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { display: false },
+                            legend: {
+                                display: true,
+                                labels: { color: '#888', boxWidth: 12, padding: 16 },
+                            },
                             tooltip: {
                                 callbacks: {
-                                    label: (ctx) => `${ctx.parsed.y} hours`,
+                                    label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}h`,
                                 },
                             },
                         },
                         scales: {
                             x: {
-                                ticks: { color: '#666', maxRotation: 45 },
+                                stacked: true,
+                                ticks: { color: '#666' },
                                 grid: { display: false },
                             },
                             y: {
+                                stacked: true,
                                 ticks: { color: '#666' },
                                 grid: { color: 'rgba(255,255,255,0.05)' },
-                                title: {
-                                    display: true,
-                                    text: 'Hours',
-                                    color: '#666',
-                                },
+                                title: { display: true, text: 'Hours', color: '#666' },
                             },
                         },
                     },
@@ -443,7 +483,7 @@
                         chartInstance.current = null;
                     }
                 };
-            }, [stats]);
+            }, [weeklyStats]);
 
             const handleToggleSleep = async () => {
                 try {
@@ -521,46 +561,83 @@
                         </button>
                     </div>
 
-                    <div className="timer">
-                        {isSleeping ? formatTimerDuration(timerMs) : ''}
+                    <div className={`timer ${isSleeping ? 'sleeping' : 'awake'}`}>
+                        {isSleeping
+                            ? formatTimerDuration(timerMs)
+                            : lastEndTime ? formatTimerDuration(awakeTimerMs) : ''}
                     </div>
 
-                    {stats && (
-                        <div className="stats-grid">
-                            <div className="stat-card">
-                                <div className="value">
-                                    {formatDuration(stats.overall.total_minutes)}
+                    {todayStats && (
+                        <React.Fragment>
+                            <div className="section-title">Today</div>
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {formatShortTimeInTz(todayStats.woke_up, timezone.tz)}
+                                    </div>
+                                    <div className="label">Woke Up</div>
                                 </div>
-                                <div className="label">Total Sleep</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="value">
-                                    {formatDuration(stats.overall.avg_minutes)}
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {todayStats.woke_up ? formatDuration(todayStats.day_sleep_minutes) : '--'}
+                                    </div>
+                                    <div className="label">Day Sleep</div>
                                 </div>
-                                <div className="label">Avg Session</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="value">
-                                    {stats.overall.total_sessions}
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {todayStats.woke_up ? formatDuration(todayStats.awake_minutes) : '--'}
+                                    </div>
+                                    <div className="label">Awake Time</div>
                                 </div>
-                                <div className="label">Sessions</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="value">
-                                    {formatDuration(stats.overall.max_minutes)}
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {todayStats.woke_up ? todayStats.naps : '--'}
+                                    </div>
+                                    <div className="label">Naps</div>
                                 </div>
-                                <div className="label">Longest</div>
                             </div>
-                        </div>
+                        </React.Fragment>
                     )}
 
-                    {stats && stats.daily && stats.daily.length > 0 && (
-                        <div className="chart-container">
-                            <h3>Daily Sleep (Last 30 Days)</h3>
-                            <div className="chart-wrapper">
-                                <canvas ref={chartRef}></canvas>
+                    {weeklyStats && (
+                        <React.Fragment>
+                            <div className="section-divider" />
+                            <div className="section-title">Last 7 Days (avg / day)</div>
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {formatDuration(weeklyStats.averages.total_minutes)}
+                                    </div>
+                                    <div className="label">Avg Sleep</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {formatDuration(weeklyStats.averages.night_minutes)}
+                                    </div>
+                                    <div className="label">Avg Night</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {formatDuration(weeklyStats.averages.day_minutes)}
+                                    </div>
+                                    <div className="label">Avg Day</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="value">
+                                        {weeklyStats.averages.naps}
+                                    </div>
+                                    <div className="label">Avg Naps</div>
+                                </div>
                             </div>
-                        </div>
+
+                            {weeklyStats.daily.length > 0 && (
+                                <div className="chart-container">
+                                    <div className="chart-wrapper">
+                                        <canvas ref={chartRef}></canvas>
+                                    </div>
+                                </div>
+                            )}
+                        </React.Fragment>
                     )}
 
                     {sessions.length > 0 && (
