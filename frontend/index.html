@@ -193,14 +193,39 @@
             margin-bottom: 32px;
         }
 
-        .sessions-list h3 {
+        .sessions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sessions-header h3 {
             font-size: 11px;
             font-weight: 600;
             color: #555;
             text-transform: uppercase;
             letter-spacing: 1.2px;
-            margin-bottom: 12px;
+            margin: 0;
         }
+
+        .add-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: #6c5ce7;
+            color: #fff;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .add-btn:active { transform: scale(0.9); }
 
         .session-item {
             background: #1a1a2e;
@@ -227,20 +252,122 @@
             margin-top: 2px;
         }
 
-        .session-item .delete-btn {
+        .session-actions {
+            display: flex;
+            gap: 2px;
+        }
+
+        .session-actions button {
             background: none;
             border: none;
             color: #555;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 8px;
             transition: all 0.2s;
         }
 
-        .session-item .delete-btn:hover {
+        .session-actions .edit-btn:hover {
+            color: #6c5ce7;
+            background: rgba(108, 92, 231, 0.1);
+        }
+
+        .session-actions .delete-btn:hover {
             color: #e84393;
             background: rgba(232, 67, 147, 0.1);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+        }
+
+        .modal-card {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .form-group input[type="datetime-local"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .form-group input:focus {
+            border-color: #6c5ce7;
+        }
+
+        /* Fix datetime-local icon color for dark theme */
+        .form-group input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.6);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn:active { transform: scale(0.97); }
+
+        .modal-btn.cancel {
+            background: #2a2a3e;
+            color: #888;
+        }
+
+        .modal-btn.save {
+            background: #6c5ce7;
+            color: #fff;
         }
 
         .error-message {
@@ -284,6 +411,51 @@
             { label: 'Barcelona', tz: 'Europe/Madrid' },
             { label: 'Moscow', tz: 'Europe/Moscow' },
         ];
+
+        // ---- Timezone helpers ----
+
+        // Convert a UTC ISO string to a datetime-local value in a given timezone
+        function utcToLocalStr(utcStr, tz) {
+            if (!utcStr) return '';
+            const d = new Date(utcStr);
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: tz,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+            }).formatToParts(d);
+            const g = (t) => parts.find(p => p.type === t).value;
+            let hour = g('hour');
+            if (hour === '24') hour = '00';
+            return `${g('year')}-${g('month')}-${g('day')}T${hour}:${g('minute')}`;
+        }
+
+        // Convert a datetime-local value (interpreted in given timezone) to a UTC ISO string
+        function localStrToUTC(localStr, tz) {
+            if (!localStr) return '';
+            const [datePart, timePart] = localStr.split('T');
+            const [y, mo, d] = datePart.split('-').map(Number);
+            const [h, mi] = timePart.split(':').map(Number);
+
+            // Create a UTC date with those raw components
+            const guess = new Date(Date.UTC(y, mo - 1, d, h, mi));
+
+            // See what that UTC instant looks like in the target timezone
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: tz,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+            }).formatToParts(guess);
+            const g = (t) => parseInt(parts.find(p => p.type === t).value);
+
+            let tzH = g('hour');
+            if (tzH === 24) tzH = 0;
+            const inTz = new Date(Date.UTC(g('year'), g('month') - 1, g('day'), tzH, g('minute')));
+            const offsetMs = inTz.getTime() - guess.getTime();
+
+            return new Date(guess.getTime() - offsetMs).toISOString();
+        }
+
+        // ---- Format helpers ----
 
         function formatDuration(minutes) {
             if (!minutes && minutes !== 0) return '--';
@@ -359,6 +531,11 @@
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
+            // Modal state: null = closed, {} = add new, {id,...} = edit
+            const [editingSession, setEditingSession] = useState(null);
+            const [formStart, setFormStart] = useState('');
+            const [formEnd, setFormEnd] = useState('');
+
             // Clock tick
             useEffect(() => {
                 const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -375,7 +552,7 @@
                 return () => clearInterval(interval);
             }, [currentSession]);
 
-            // Awake timer — time since last session ended
+            // Awake timer
             const lastEndTime = !currentSession && sessions.length > 0
                 ? ((sessions.find(s => s.end_time) || {}).end_time || null)
                 : null;
@@ -413,7 +590,7 @@
                 loadData();
             }, [loadData]);
 
-            // Stacked bar chart (night vs day, last 7 days)
+            // Stacked bar chart
             useEffect(() => {
                 if (!weeklyStats || !weeklyStats.daily || !chartRef.current) return;
                 if (chartInstance.current) { chartInstance.current.destroy(); }
@@ -484,6 +661,54 @@
                     }
                 };
             }, [weeklyStats]);
+
+            // ---- Session form handlers ----
+
+            const openAddForm = () => {
+                setFormStart('');
+                setFormEnd('');
+                setEditingSession({});
+            };
+
+            const openEditForm = (session) => {
+                setFormStart(utcToLocalStr(session.start_time, timezone.tz));
+                setFormEnd(utcToLocalStr(session.end_time, timezone.tz));
+                setEditingSession(session);
+            };
+
+            const closeForm = () => {
+                setEditingSession(null);
+            };
+
+            const handleSaveSession = async () => {
+                try {
+                    setError(null);
+                    if (!formStart || !formEnd) {
+                        setError('Both start and end times are required');
+                        return;
+                    }
+                    const startUTC = localStrToUTC(formStart, timezone.tz);
+                    const endUTC = localStrToUTC(formEnd, timezone.tz);
+
+                    if (editingSession.id) {
+                        await apiFetch(`/sleep/sessions/${editingSession.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ start_time: startUTC, end_time: endUTC }),
+                        });
+                    } else {
+                        await apiFetch('/sleep/sessions', {
+                            method: 'POST',
+                            body: JSON.stringify({ start_time: startUTC, end_time: endUTC }),
+                        });
+                    }
+                    setEditingSession(null);
+                    await loadData();
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            // ---- Sleep toggle ----
 
             const handleToggleSleep = async () => {
                 try {
@@ -640,21 +865,31 @@
                         </React.Fragment>
                     )}
 
-                    {sessions.length > 0 && (
-                        <div className="sessions-list">
+                    <div className="sessions-list">
+                        <div className="sessions-header">
                             <h3>Recent Sessions</h3>
-                            {sessions.filter(s => s.end_time).map(session => (
-                                <div key={session.id} className="session-item">
-                                    <div className="session-info">
-                                        <div className="session-time">
-                                            {formatDateTimeInTz(session.start_time, timezone.tz)}
-                                            {' \u2192 '}
-                                            {formatDateTimeInTz(session.end_time, timezone.tz)}
-                                        </div>
-                                        <div className="session-duration">
-                                            {formatDuration(session.duration_minutes)}
-                                        </div>
+                            <button className="add-btn" onClick={openAddForm} title="Add session">+</button>
+                        </div>
+                        {sessions.filter(s => s.end_time).map(session => (
+                            <div key={session.id} className="session-item">
+                                <div className="session-info">
+                                    <div className="session-time">
+                                        {formatDateTimeInTz(session.start_time, timezone.tz)}
+                                        {' \u2192 '}
+                                        {formatDateTimeInTz(session.end_time, timezone.tz)}
                                     </div>
+                                    <div className="session-duration">
+                                        {formatDuration(session.duration_minutes)}
+                                    </div>
+                                </div>
+                                <div className="session-actions">
+                                    <button
+                                        className="edit-btn"
+                                        onClick={() => openEditForm(session)}
+                                        title="Edit session"
+                                    >
+                                        {'\u270E'}
+                                    </button>
                                     <button
                                         className="delete-btn"
                                         onClick={() => handleDeleteSession(session.id)}
@@ -663,7 +898,37 @@
                                         {'\u2715'}
                                     </button>
                                 </div>
-                            ))}
+                            </div>
+                        ))}
+                    </div>
+
+                    {editingSession && (
+                        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeForm(); }}>
+                            <div className="modal-card">
+                                <div className="modal-title">
+                                    {editingSession.id ? 'Edit Session' : 'Add Session'}
+                                </div>
+                                <div className="form-group">
+                                    <label>Start ({timezone.label})</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={formStart}
+                                        onChange={e => setFormStart(e.target.value)}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>End ({timezone.label})</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={formEnd}
+                                        onChange={e => setFormEnd(e.target.value)}
+                                    />
+                                </div>
+                                <div className="modal-buttons">
+                                    <button className="modal-btn cancel" onClick={closeForm}>Cancel</button>
+                                    <button className="modal-btn save" onClick={handleSaveSession}>Save</button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
