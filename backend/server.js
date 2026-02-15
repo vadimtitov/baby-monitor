@@ -180,6 +180,52 @@ app.get('/api/sleep/sessions', async (req, res) => {
   }
 });
 
+// Create a backfilled session (manual entry)
+app.post('/api/sleep/sessions', async (req, res) => {
+  try {
+    const { start_time, end_time } = req.body;
+    if (!start_time || !end_time) {
+      return res.status(400).json({ error: 'start_time and end_time are required' });
+    }
+    if (new Date(end_time) <= new Date(start_time)) {
+      return res.status(400).json({ error: 'end_time must be after start_time' });
+    }
+    const result = await pool.query(
+      'INSERT INTO sleep_sessions (start_time, end_time) VALUES ($1, $2) RETURNING *',
+      [start_time, end_time]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating session:', err);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// Update an existing session
+app.put('/api/sleep/sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_time, end_time } = req.body;
+    if (!start_time || !end_time) {
+      return res.status(400).json({ error: 'start_time and end_time are required' });
+    }
+    if (new Date(end_time) <= new Date(start_time)) {
+      return res.status(400).json({ error: 'end_time must be after start_time' });
+    }
+    const result = await pool.query(
+      'UPDATE sleep_sessions SET start_time = $1, end_time = $2 WHERE id = $3 RETURNING *',
+      [start_time, end_time, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating session:', err);
+    res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
 // Today stats — anchored to morning wake-up (last sleep end between 04:00–12:00 UTC today)
 app.get('/api/sleep/stats/today', async (req, res) => {
   try {
