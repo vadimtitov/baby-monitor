@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Baby Sleep">
+    <title>Baby Sleep Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .timezone-bar {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .tz-btn {
+            padding: 6px 14px;
+            border: 1px solid #333;
+            border-radius: 20px;
+            background: transparent;
+            color: #888;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tz-btn.active {
+            background: #6c5ce7;
+            border-color: #6c5ce7;
+            color: #fff;
+        }
+
+        .current-time {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .sleep-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+        }
+
+        .sleep-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sleep-button:active {
+            transform: scale(0.95);
+        }
+
+        .sleep-button.awake {
+            background: linear-gradient(135deg, #e84393, #fd79a8);
+            box-shadow: 0 8px 32px rgba(232, 67, 147, 0.4);
+        }
+
+        .sleep-button.sleeping {
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.4);
+        }
+
+        .sleep-button .icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+
+        .sleep-button .label {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 36px;
+            font-weight: 300;
+            color: #a29bfe;
+            margin-bottom: 32px;
+            min-height: 44px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-container {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-container h3 {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+        }
+
+        .sessions-list {
+            margin-bottom: 32px;
+        }
+
+        .sessions-list h3 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .session-item {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .session-item .session-info {
+            flex: 1;
+        }
+
+        .session-item .session-time {
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .session-item .session-duration {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .session-item .delete-btn {
+            background: none;
+            border: none;
+            color: #555;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .session-item .delete-btn:hover {
+            color: #e84393;
+            background: rgba(232, 67, 147, 0.1);
+        }
+
+        .error-message {
+            background: rgba(232, 67, 147, 0.15);
+            border: 1px solid rgba(232, 67, 147, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            text-align: center;
+            color: #fd79a8;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .sleeping-indicator {
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        const API_BASE = '/api';
+
+        const TIMEZONES = [
+            { label: 'London', tz: 'Europe/London' },
+            { label: 'Barcelona', tz: 'Europe/Madrid' },
+            { label: 'Moscow', tz: 'Europe/Moscow' },
+        ];
+
+        function formatDuration(minutes) {
+            if (!minutes && minutes !== 0) return '--';
+            const h = Math.floor(minutes / 60);
+            const m = Math.round(minutes % 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        function formatTimerDuration(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        function formatTimeInTz(date, tz) {
+            return new Intl.DateTimeFormat('en-GB', {
+                timeZone: tz,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+            }).format(date);
+        }
+
+        function formatDateTimeInTz(dateStr, tz) {
+            const d = new Date(dateStr);
+            return new Intl.DateTimeFormat('en-GB', {
+                timeZone: tz,
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }).format(d);
+        }
+
+        async function apiFetch(path, options = {}) {
+            const res = await fetch(`${API_BASE}${path}`, {
+                headers: { 'Content-Type': 'application/json' },
+                ...options,
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `Request failed (${res.status})`);
+            }
+            return res.json();
+        }
+
+        function App() {
+            const [timezone, setTimezone] = useState(TIMEZONES[0]);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [currentSession, setCurrentSession] = useState(null);
+            const [stats, setStats] = useState(null);
+            const [sessions, setSessions] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [timerMs, setTimerMs] = useState(0);
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            // Clock tick
+            useEffect(() => {
+                const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Timer tick
+            useEffect(() => {
+                if (!currentSession) {
+                    setTimerMs(0);
+                    return;
+                }
+                const startTime = new Date(currentSession.start_time).getTime();
+                const update = () => setTimerMs(Date.now() - startTime);
+                update();
+                const interval = setInterval(update, 1000);
+                return () => clearInterval(interval);
+            }, [currentSession]);
+
+            const loadData = useCallback(async () => {
+                try {
+                    const [session, statsData, sessionsData] = await Promise.all([
+                        apiFetch('/sleep/current'),
+                        apiFetch('/sleep/stats'),
+                        apiFetch('/sleep/sessions?limit=20'),
+                    ]);
+                    setCurrentSession(session);
+                    setStats(statsData);
+                    setSessions(sessionsData);
+                    setError(null);
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            }, []);
+
+            useEffect(() => {
+                loadData();
+            }, [loadData]);
+
+            // Chart
+            useEffect(() => {
+                if (!stats || !stats.daily || !chartRef.current) return;
+
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+
+                const ctx = chartRef.current.getContext('2d');
+                const dailyData = stats.daily;
+
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: dailyData.map(d => {
+                            const date = new Date(d.date);
+                            return new Intl.DateTimeFormat('en-GB', {
+                                month: 'short',
+                                day: 'numeric',
+                            }).format(date);
+                        }),
+                        datasets: [{
+                            label: 'Sleep (hours)',
+                            data: dailyData.map(d => (d.total_minutes / 60).toFixed(1)),
+                            backgroundColor: 'rgba(108, 92, 231, 0.6)',
+                            borderColor: 'rgba(108, 92, 231, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => `${ctx.parsed.y} hours`,
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#666', maxRotation: 45 },
+                                grid: { display: false },
+                            },
+                            y: {
+                                ticks: { color: '#666' },
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                title: {
+                                    display: true,
+                                    text: 'Hours',
+                                    color: '#666',
+                                },
+                            },
+                        },
+                    },
+                });
+
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                        chartInstance.current = null;
+                    }
+                };
+            }, [stats]);
+
+            const handleToggleSleep = async () => {
+                try {
+                    setError(null);
+                    if (currentSession) {
+                        await apiFetch('/sleep/end', { method: 'POST' });
+                    } else {
+                        await apiFetch('/sleep/start', { method: 'POST' });
+                    }
+                    await loadData();
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            const handleDeleteSession = async (id) => {
+                if (!confirm('Delete this sleep session?')) return;
+                try {
+                    setError(null);
+                    await apiFetch(`/sleep/sessions/${id}`, { method: 'DELETE' });
+                    await loadData();
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="app-container">
+                        <div className="loading">Loading...</div>
+                    </div>
+                );
+            }
+
+            const isSleeping = !!currentSession;
+
+            return (
+                <div className="app-container">
+                    <div className="header">
+                        <h1>Baby Sleep Tracker</h1>
+                        <div className="timezone-bar">
+                            {TIMEZONES.map(tz => (
+                                <button
+                                    key={tz.tz}
+                                    className={`tz-btn ${timezone.tz === tz.tz ? 'active' : ''}`}
+                                    onClick={() => setTimezone(tz)}
+                                >
+                                    {tz.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="current-time">
+                            {formatTimeInTz(currentTime, timezone.tz)}
+                        </div>
+                    </div>
+
+                    {error && <div className="error-message">{error}</div>}
+
+                    <div className="sleep-button-container">
+                        <button
+                            className={`sleep-button ${isSleeping ? 'sleeping' : 'awake'}`}
+                            onClick={handleToggleSleep}
+                        >
+                            <span className={`icon ${isSleeping ? 'sleeping-indicator' : ''}`}>
+                                {isSleeping ? '\u{1F31C}' : '\u{2600}\u{FE0F}'}
+                            </span>
+                            <span>{isSleeping ? 'Sleeping' : 'Awake'}</span>
+                            <span className="label">
+                                {isSleeping ? 'Tap to wake' : 'Tap to sleep'}
+                            </span>
+                        </button>
+                    </div>
+
+                    <div className="timer">
+                        {isSleeping ? formatTimerDuration(timerMs) : ''}
+                    </div>
+
+                    {stats && (
+                        <div className="stats-grid">
+                            <div className="stat-card">
+                                <div className="value">
+                                    {formatDuration(stats.overall.total_minutes)}
+                                </div>
+                                <div className="label">Total Sleep</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="value">
+                                    {formatDuration(stats.overall.avg_minutes)}
+                                </div>
+                                <div className="label">Avg Session</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="value">
+                                    {stats.overall.total_sessions}
+                                </div>
+                                <div className="label">Sessions</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="value">
+                                    {formatDuration(stats.overall.max_minutes)}
+                                </div>
+                                <div className="label">Longest</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {stats && stats.daily && stats.daily.length > 0 && (
+                        <div className="chart-container">
+                            <h3>Daily Sleep (Last 30 Days)</h3>
+                            <div className="chart-wrapper">
+                                <canvas ref={chartRef}></canvas>
+                            </div>
+                        </div>
+                    )}
+
+                    {sessions.length > 0 && (
+                        <div className="sessions-list">
+                            <h3>Recent Sessions</h3>
+                            {sessions.filter(s => s.end_time).map(session => (
+                                <div key={session.id} className="session-item">
+                                    <div className="session-info">
+                                        <div className="session-time">
+                                            {formatDateTimeInTz(session.start_time, timezone.tz)}
+                                            {' \u2192 '}
+                                            {formatDateTimeInTz(session.end_time, timezone.tz)}
+                                        </div>
+                                        <div className="session-duration">
+                                            {formatDuration(session.duration_minutes)}
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="delete-btn"
+                                        onClick={() => handleDeleteSession(session.id)}
+                                        title="Delete session"
+                                    >
+                                        {'\u2715'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
