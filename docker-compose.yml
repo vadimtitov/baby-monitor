@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     environment:
       DB_URI: ${DB_URI:?DB_URI is required}
+      NIGHT_START_HOUR: ${NIGHT_START_HOUR:-19}
       HA_URL: ${HA_URL:-}
       HA_TOKEN: ${HA_TOKEN:-}
 
