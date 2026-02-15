@@ -449,13 +449,17 @@
                 try {
                     setError(null);
                     if (currentSession) {
+                        setCurrentSession(null);
                         await apiFetch('/sleep/end', { method: 'POST' });
                     } else {
+                        const now = new Date().toISOString();
+                        setCurrentSession({ start_time: now });
                         await apiFetch('/sleep/start', { method: 'POST' });
                     }
                     await loadData();
                 } catch (err) {
                     setError(err.message);
+                    await loadData();
                 }
             };
 
