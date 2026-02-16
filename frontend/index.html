@@ -113,11 +113,17 @@
         .sleep-button .icon { font-size: 48px; margin-bottom: 8px; }
         .sleep-button .label { font-size: 16px; opacity: 0.9; }
 
+        .sleep-button.has-photo {
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
         .sleep-button .photo {
-            width: 100px;
-            height: 100px;
+            width: 140px;
+            height: 140px;
             object-fit: contain;
             pointer-events: none;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
         }
 
         .timer {
@@ -1042,7 +1048,7 @@
 
                     <div className="sleep-button-container">
                         <button
-                            className={`sleep-button ${isSleeping ? 'sleeping' : 'awake'}`}
+                            className={`sleep-button ${isSleeping ? 'sleeping' : 'awake'}${currentPhoto ? ' has-photo' : ''}`}
                             onClick={handleToggleSleep}
                         >
                             <span className={`icon ${isSleeping ? 'sleeping-indicator' : ''}`}>
