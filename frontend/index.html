@@ -12,11 +12,7 @@
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script crossorigin src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -33,10 +29,7 @@
             min-height: 100vh;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
+        .header { text-align: center; margin-bottom: 24px; }
 
         .header h1 {
             font-size: 22px;
@@ -45,34 +38,29 @@
             margin-bottom: 8px;
         }
 
-        .timezone-bar {
+        .tz-row {
             display: flex;
             justify-content: center;
-            gap: 8px;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 8px;
         }
 
-        .tz-btn {
-            padding: 6px 14px;
+        .tz-select {
+            padding: 7px 12px;
             border: 1px solid #333;
-            border-radius: 20px;
-            background: transparent;
-            color: #888;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .tz-btn.active {
-            background: #6c5ce7;
-            border-color: #6c5ce7;
-            color: #fff;
-        }
-
-        .current-time {
+            border-radius: 12px;
+            background: #1a1a2e;
+            color: #e0e0e0;
             font-size: 14px;
-            color: #888;
+            font-family: inherit;
+            outline: none;
+            cursor: pointer;
         }
+
+        .tz-select:focus { border-color: #6c5ce7; }
+
+        .current-time { font-size: 14px; color: #888; }
 
         .sleep-button-container {
             display: flex;
@@ -94,13 +82,10 @@
             font-weight: 600;
             color: #fff;
             transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .sleep-button:active {
-            transform: scale(0.95);
-        }
+        .sleep-button:active { transform: scale(0.95); }
 
         .sleep-button.awake {
             background: linear-gradient(135deg, #e84393, #fd79a8);
@@ -112,15 +97,8 @@
             box-shadow: 0 8px 32px rgba(108, 92, 231, 0.4);
         }
 
-        .sleep-button .icon {
-            font-size: 48px;
-            margin-bottom: 8px;
-        }
-
-        .sleep-button .label {
-            font-size: 16px;
-            opacity: 0.9;
-        }
+        .sleep-button .icon { font-size: 48px; margin-bottom: 8px; }
+        .sleep-button .label { font-size: 16px; opacity: 0.9; }
 
         .timer {
             text-align: center;
@@ -171,7 +149,7 @@
         }
 
         .stat-card .label {
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -184,14 +162,9 @@
             margin-bottom: 24px;
         }
 
-        .chart-wrapper {
-            position: relative;
-            height: 200px;
-        }
+        .chart-wrapper { position: relative; height: 200px; }
 
-        .sessions-list {
-            margin-bottom: 32px;
-        }
+        .sessions-list { margin-bottom: 32px; }
 
         .sessions-header {
             display: flex;
@@ -237,25 +210,11 @@
             align-items: center;
         }
 
-        .session-item .session-info {
-            flex: 1;
-        }
+        .session-item .session-info { flex: 1; }
+        .session-item .session-time { font-size: 14px; color: #fff; }
+        .session-item .session-duration { font-size: 12px; color: #888; margin-top: 2px; }
 
-        .session-item .session-time {
-            font-size: 14px;
-            color: #fff;
-        }
-
-        .session-item .session-duration {
-            font-size: 12px;
-            color: #888;
-            margin-top: 2px;
-        }
-
-        .session-actions {
-            display: flex;
-            gap: 2px;
-        }
+        .session-actions { display: flex; gap: 2px; }
 
         .session-actions button {
             background: none;
@@ -306,9 +265,7 @@
             text-align: center;
         }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
+        .form-group { margin-bottom: 16px; }
 
         .form-group label {
             display: block;
@@ -332,20 +289,13 @@
             -webkit-appearance: none;
         }
 
-        .form-group input:focus {
-            border-color: #6c5ce7;
-        }
+        .form-group input:focus { border-color: #6c5ce7; }
 
-        /* Fix datetime-local icon color for dark theme */
         .form-group input[type="datetime-local"]::-webkit-calendar-picker-indicator {
             filter: invert(0.6);
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
+        .modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
 
         .modal-btn {
             flex: 1;
@@ -359,16 +309,8 @@
         }
 
         .modal-btn:active { transform: scale(0.97); }
-
-        .modal-btn.cancel {
-            background: #2a2a3e;
-            color: #888;
-        }
-
-        .modal-btn.save {
-            background: #6c5ce7;
-            color: #fff;
-        }
+        .modal-btn.cancel { background: #2a2a3e; color: #888; }
+        .modal-btn.save   { background: #6c5ce7; color: #fff; }
 
         .error-message {
             background: rgba(232, 67, 147, 0.15);
@@ -381,21 +323,14 @@
             margin-bottom: 16px;
         }
 
-        .loading {
-            text-align: center;
-            color: #888;
-            padding: 40px;
-            font-size: 16px;
-        }
+        .loading { text-align: center; color: #888; padding: 40px; font-size: 16px; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
 
-        .sleeping-indicator {
-            animation: pulse 2s ease-in-out infinite;
-        }
+        .sleeping-indicator { animation: pulse 2s ease-in-out infinite; }
     </style>
 </head>
 <body>
@@ -406,15 +341,131 @@
 
         const API_BASE = '/api';
 
-        const TIMEZONES = [
+        // ---- Translations ----
+
+        const TRANSLATIONS = {
+            en: {
+                title: 'Baby Sleep Tracker',
+                titleTpl: "{name}'s Sleep Tracker",
+                loading: 'Loading\u2026',
+                sleeping: 'Sleeping',
+                awake: 'Awake',
+                tapToWake: 'Tap to wake',
+                tapToSleep: 'Tap to sleep',
+                today: 'Today',
+                wokeUp: 'Woke Up',
+                daySleep: 'Day Sleep',
+                awakeTime: 'Awake Time',
+                naps: 'Naps',
+                last7Days: 'Last 7 Days (avg / day)',
+                avgSleep: 'Avg Sleep',
+                avgNight: 'Avg Night',
+                avgDay: 'Avg Day',
+                avgNaps: 'Avg Naps',
+                recentSessions: 'Recent Sessions',
+                addSession: 'Add Session',
+                editSession: 'Edit Session',
+                start: 'Start',
+                end: 'End',
+                cancel: 'Cancel',
+                save: 'Save',
+                deleteConfirm: 'Delete this sleep session?',
+                formError: 'Both start and end times are required',
+                hours: 'Hours',
+                night: 'Night',
+                day: 'Day',
+            },
+            ru: {
+                title: '\u0422\u0440\u0435\u043A\u0435\u0440 \u0441\u043D\u0430',
+                titleTpl: '\u0421\u043E\u043D \u2014 {name}',
+                loading: '\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430\u2026',
+                sleeping: '\u0421\u043F\u0438\u0442',
+                awake: '\u041D\u0435 \u0441\u043F\u0438\u0442',
+                tapToWake: '\u041D\u0430\u0436\u043C\u0438 \u2014 \u043F\u0440\u043E\u0441\u043D\u0443\u043B\u0441\u044F',
+                tapToSleep: '\u041D\u0430\u0436\u043C\u0438 \u2014 \u0443\u0441\u043D\u0443\u043B',
+                today: '\u0421\u0435\u0433\u043E\u0434\u043D\u044F',
+                wokeUp: '\u041F\u043E\u0434\u044A\u0451\u043C',
+                daySleep: '\u0414\u043D\u0435\u0432\u043D\u043E\u0439 \u0441\u043E\u043D',
+                awakeTime: '\u0411\u043E\u0434\u0440\u0441\u0442\u0432\u0443\u0435\u0442',
+                naps: '\u0421\u043D\u044B',
+                last7Days: '7 \u0434\u043D\u0435\u0439 (\u0441\u0440\u0435\u0434./\u0434\u0435\u043D\u044C)',
+                avgSleep: '\u0421\u0440\u0435\u0434. \u0441\u043E\u043D',
+                avgNight: '\u0421\u0440\u0435\u0434. \u043D\u043E\u0447\u044C',
+                avgDay: '\u0421\u0440\u0435\u0434. \u0434\u0435\u043D\u044C',
+                avgNaps: '\u0421\u0440\u0435\u0434. \u0441\u043D\u044B',
+                recentSessions: '\u0417\u0430\u043F\u0438\u0441\u0438',
+                addSession: '\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C',
+                editSession: '\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C',
+                start: '\u041D\u0430\u0447\u0430\u043B\u043E',
+                end: '\u041A\u043E\u043D\u0435\u0446',
+                cancel: '\u041E\u0442\u043C\u0435\u043D\u0430',
+                save: '\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C',
+                deleteConfirm: '\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u0443 \u0437\u0430\u043F\u0438\u0441\u044C?',
+                formError: '\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043D\u0430\u0447\u0430\u043B\u043E \u0438 \u043A\u043E\u043D\u0435\u0446',
+                hours: '\u0427\u0430\u0441\u044B',
+                night: '\u041D\u043E\u0447\u044C',
+                day: '\u0414\u0435\u043D\u044C',
+            },
+            es: {
+                title: 'Seguimiento de sue\u00F1o',
+                titleTpl: 'Sue\u00F1o de {name}',
+                loading: 'Cargando\u2026',
+                sleeping: 'Durmiendo',
+                awake: 'Despierto',
+                tapToWake: 'Toca para despertar',
+                tapToSleep: 'Toca para dormir',
+                today: 'Hoy',
+                wokeUp: 'Despert\u00F3',
+                daySleep: 'Sue\u00F1o diurno',
+                awakeTime: 'Despierto',
+                naps: 'Siestas',
+                last7Days: '7 d\u00EDas (prom./d\u00EDa)',
+                avgSleep: 'Prom. sue\u00F1o',
+                avgNight: 'Prom. noche',
+                avgDay: 'Prom. d\u00EDa',
+                avgNaps: 'Prom. siestas',
+                recentSessions: 'Sesiones',
+                addSession: 'Agregar',
+                editSession: 'Editar',
+                start: 'Inicio',
+                end: 'Fin',
+                cancel: 'Cancelar',
+                save: 'Guardar',
+                deleteConfirm: '\u00BFEliminar esta sesi\u00F3n?',
+                formError: 'Se requieren inicio y fin',
+                hours: 'Horas',
+                night: 'Noche',
+                day: 'D\u00EDa',
+            },
+        };
+
+        // ---- Timezone options ----
+
+        const TIMEZONE_OPTIONS = [
             { label: 'London', tz: 'Europe/London' },
-            { label: 'Barcelona', tz: 'Europe/Madrid' },
+            { label: 'Paris', tz: 'Europe/Paris' },
+            { label: 'Berlin', tz: 'Europe/Berlin' },
+            { label: 'Madrid', tz: 'Europe/Madrid' },
+            { label: 'Rome', tz: 'Europe/Rome' },
             { label: 'Moscow', tz: 'Europe/Moscow' },
+            { label: 'Istanbul', tz: 'Europe/Istanbul' },
+            { label: 'Dubai', tz: 'Asia/Dubai' },
+            { label: 'Mumbai', tz: 'Asia/Kolkata' },
+            { label: 'Bangkok', tz: 'Asia/Bangkok' },
+            { label: 'Singapore', tz: 'Asia/Singapore' },
+            { label: 'Shanghai', tz: 'Asia/Shanghai' },
+            { label: 'Tokyo', tz: 'Asia/Tokyo' },
+            { label: 'Sydney', tz: 'Australia/Sydney' },
+            { label: 'Auckland', tz: 'Pacific/Auckland' },
+            { label: 'S\u00E3o Paulo', tz: 'America/Sao_Paulo' },
+            { label: 'New York', tz: 'America/New_York' },
+            { label: 'Chicago', tz: 'America/Chicago' },
+            { label: 'Denver', tz: 'America/Denver' },
+            { label: 'Los Angeles', tz: 'America/Los_Angeles' },
         ];
 
-        // ---- Timezone helpers ----
+        // ---- Timezone conversion helpers ----
 
-        // Convert a UTC ISO string to a datetime-local value in a given timezone
         function utcToLocalStr(utcStr, tz) {
             if (!utcStr) return '';
             const d = new Date(utcStr);
@@ -429,29 +480,22 @@
             return `${g('year')}-${g('month')}-${g('day')}T${hour}:${g('minute')}`;
         }
 
-        // Convert a datetime-local value (interpreted in given timezone) to a UTC ISO string
         function localStrToUTC(localStr, tz) {
             if (!localStr) return '';
             const [datePart, timePart] = localStr.split('T');
             const [y, mo, d] = datePart.split('-').map(Number);
             const [h, mi] = timePart.split(':').map(Number);
-
-            // Create a UTC date with those raw components
             const guess = new Date(Date.UTC(y, mo - 1, d, h, mi));
-
-            // See what that UTC instant looks like in the target timezone
             const parts = new Intl.DateTimeFormat('en-CA', {
                 timeZone: tz,
                 year: 'numeric', month: '2-digit', day: '2-digit',
                 hour: '2-digit', minute: '2-digit', hour12: false,
             }).formatToParts(guess);
             const g = (t) => parseInt(parts.find(p => p.type === t).value);
-
             let tzH = g('hour');
             if (tzH === 24) tzH = 0;
             const inTz = new Date(Date.UTC(g('year'), g('month') - 1, g('day'), tzH, g('minute')));
             const offsetMs = inTz.getTime() - guess.getTime();
-
             return new Date(guess.getTime() - offsetMs).toISOString();
         }
 
@@ -476,10 +520,7 @@
         function formatTimeInTz(date, tz) {
             return new Intl.DateTimeFormat('en-GB', {
                 timeZone: tz,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
             }).format(date);
         }
 
@@ -487,22 +528,22 @@
             if (!dateStr) return '--';
             return new Intl.DateTimeFormat('en-GB', {
                 timeZone: tz,
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
+                hour: '2-digit', minute: '2-digit', hour12: false,
             }).format(new Date(dateStr));
         }
 
-        function formatDateTimeInTz(dateStr, tz) {
-            const d = new Date(dateStr);
-            return new Intl.DateTimeFormat('en-GB', {
+        function formatDateTimeInTz(dateStr, tz, locale) {
+            return new Intl.DateTimeFormat(locale || 'en-GB', {
                 timeZone: tz,
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            }).format(d);
+                month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+            }).format(new Date(dateStr));
+        }
+
+        function localeForLang(lang) {
+            if (lang === 'ru') return 'ru-RU';
+            if (lang === 'es') return 'es-ES';
+            return 'en-GB';
         }
 
         async function apiFetch(path, options = {}) {
@@ -517,8 +558,11 @@
             return res.json();
         }
 
+        // ---- App ----
+
         function App() {
-            const [timezone, setTimezone] = useState(TIMEZONES[0]);
+            const [config, setConfig] = useState({ language: 'en', baby_name: '' });
+            const [timezone, setTimezone] = useState(TIMEZONE_OPTIONS[0]);
             const [currentTime, setCurrentTime] = useState(new Date());
             const [currentSession, setCurrentSession] = useState(null);
             const [todayStats, setTodayStats] = useState(null);
@@ -531,10 +575,23 @@
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
-            // Modal state: null = closed, {} = add new, {id,...} = edit
+            // Modal state
             const [editingSession, setEditingSession] = useState(null);
             const [formStart, setFormStart] = useState('');
             const [formEnd, setFormEnd] = useState('');
+
+            // Translation helper
+            const lang = config.language || 'en';
+            const t = (key) => (TRANSLATIONS[lang] || TRANSLATIONS.en)[key] || TRANSLATIONS.en[key] || key;
+            const locale = localeForLang(lang);
+
+            // Page title
+            useEffect(() => {
+                const name = config.baby_name;
+                document.title = name
+                    ? t('titleTpl').replace('{name}', name)
+                    : t('title');
+            }, [config]);
 
             // Clock tick
             useEffect(() => {
@@ -566,6 +623,7 @@
                 return () => clearInterval(interval);
             }, [lastEndTime]);
 
+            // Load sleep data (called on init and after mutations)
             const loadData = useCallback(async () => {
                 try {
                     const [session, today, weekly, sessionsData] = await Promise.all([
@@ -581,14 +639,28 @@
                     setError(null);
                 } catch (err) {
                     setError(err.message);
-                } finally {
-                    setLoading(false);
                 }
             }, []);
 
+            // Initial load: config + settings + data
             useEffect(() => {
-                loadData();
-            }, [loadData]);
+                async function init() {
+                    try {
+                        const [cfg, settings] = await Promise.all([
+                            apiFetch('/config'),
+                            apiFetch('/settings'),
+                        ]);
+                        setConfig(cfg);
+                        if (settings.timezone) {
+                            const found = TIMEZONE_OPTIONS.find(o => o.tz === settings.timezone);
+                            if (found) setTimezone(found);
+                        }
+                    } catch (e) {}
+                    await loadData();
+                    setLoading(false);
+                }
+                init();
+            }, []);
 
             // Stacked bar chart
             useEffect(() => {
@@ -602,12 +674,12 @@
                     type: 'bar',
                     data: {
                         labels: days.map(d => {
-                            const date = new Date(d.date);
-                            return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric' }).format(date);
+                            return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' })
+                                .format(new Date(d.date));
                         }),
                         datasets: [
                             {
-                                label: 'Night',
+                                label: t('night'),
                                 data: days.map(d => +(d.night_minutes / 60).toFixed(1)),
                                 backgroundColor: 'rgba(108, 92, 231, 0.75)',
                                 borderColor: 'rgba(108, 92, 231, 1)',
@@ -615,7 +687,7 @@
                                 borderRadius: 3,
                             },
                             {
-                                label: 'Day',
+                                label: t('day'),
                                 data: days.map(d => +(d.day_minutes / 60).toFixed(1)),
                                 backgroundColor: 'rgba(232, 67, 147, 0.75)',
                                 borderColor: 'rgba(232, 67, 147, 1)',
@@ -634,7 +706,7 @@
                             },
                             tooltip: {
                                 callbacks: {
-                                    label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}h`,
+                                    label: item => `${item.dataset.label}: ${item.parsed.y}h`,
                                 },
                             },
                         },
@@ -648,7 +720,7 @@
                                 stacked: true,
                                 ticks: { color: '#666' },
                                 grid: { color: 'rgba(255,255,255,0.05)' },
-                                title: { display: true, text: 'Hours', color: '#666' },
+                                title: { display: true, text: t('hours'), color: '#666' },
                             },
                         },
                     },
@@ -660,7 +732,20 @@
                         chartInstance.current = null;
                     }
                 };
-            }, [weeklyStats]);
+            }, [weeklyStats, lang]);
+
+            // ---- Timezone change ----
+
+            const handleTimezoneChange = (e) => {
+                const found = TIMEZONE_OPTIONS.find(o => o.tz === e.target.value);
+                if (found) {
+                    setTimezone(found);
+                    apiFetch('/settings/timezone', {
+                        method: 'PUT',
+                        body: JSON.stringify({ value: found.tz }),
+                    }).catch(() => {});
+                }
+            };
 
             // ---- Session form handlers ----
 
@@ -676,15 +761,13 @@
                 setEditingSession(session);
             };
 
-            const closeForm = () => {
-                setEditingSession(null);
-            };
+            const closeForm = () => setEditingSession(null);
 
             const handleSaveSession = async () => {
                 try {
                     setError(null);
                     if (!formStart || !formEnd) {
-                        setError('Both start and end times are required');
+                        setError(t('formError'));
                         return;
                     }
                     const startUTC = localStrToUTC(formStart, timezone.tz);
@@ -729,7 +812,7 @@
             };
 
             const handleDeleteSession = async (id) => {
-                if (!confirm('Delete this sleep session?')) return;
+                if (!confirm(t('deleteConfirm'))) return;
                 try {
                     setError(null);
                     await apiFetch(`/sleep/sessions/${id}`, { method: 'DELETE' });
@@ -742,27 +825,30 @@
             if (loading) {
                 return (
                     <div className="app-container">
-                        <div className="loading">Loading...</div>
+                        <div className="loading">{t('loading')}</div>
                     </div>
                 );
             }
 
             const isSleeping = !!currentSession;
+            const pageTitle = config.baby_name
+                ? t('titleTpl').replace('{name}', config.baby_name)
+                : t('title');
 
             return (
                 <div className="app-container">
                     <div className="header">
-                        <h1>Baby Sleep Tracker</h1>
-                        <div className="timezone-bar">
-                            {TIMEZONES.map(tz => (
-                                <button
-                                    key={tz.tz}
-                                    className={`tz-btn ${timezone.tz === tz.tz ? 'active' : ''}`}
-                                    onClick={() => setTimezone(tz)}
-                                >
-                                    {tz.label}
-                                </button>
-                            ))}
+                        <h1>{pageTitle}</h1>
+                        <div className="tz-row">
+                            <select
+                                className="tz-select"
+                                value={timezone.tz}
+                                onChange={handleTimezoneChange}
+                            >
+                                {TIMEZONE_OPTIONS.map(o => (
+                                    <option key={o.tz} value={o.tz}>{o.label}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="current-time">
                             {formatTimeInTz(currentTime, timezone.tz)}
@@ -779,9 +865,9 @@
                             <span className={`icon ${isSleeping ? 'sleeping-indicator' : ''}`}>
                                 {isSleeping ? '\u{1F31C}' : '\u{2600}\u{FE0F}'}
                             </span>
-                            <span>{isSleeping ? 'Sleeping' : 'Awake'}</span>
+                            <span>{isSleeping ? t('sleeping') : t('awake')}</span>
                             <span className="label">
-                                {isSleeping ? 'Tap to wake' : 'Tap to sleep'}
+                                {isSleeping ? t('tapToWake') : t('tapToSleep')}
                             </span>
                         </button>
                     </div>
@@ -794,31 +880,31 @@
 
                     {todayStats && (
                         <React.Fragment>
-                            <div className="section-title">Today</div>
+                            <div className="section-title">{t('today')}</div>
                             <div className="stats-grid">
                                 <div className="stat-card">
                                     <div className="value">
                                         {formatShortTimeInTz(todayStats.woke_up, timezone.tz)}
                                     </div>
-                                    <div className="label">Woke Up</div>
+                                    <div className="label">{t('wokeUp')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {todayStats.woke_up ? formatDuration(todayStats.day_sleep_minutes) : '--'}
                                     </div>
-                                    <div className="label">Day Sleep</div>
+                                    <div className="label">{t('daySleep')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {todayStats.woke_up ? formatDuration(todayStats.awake_minutes) : '--'}
                                     </div>
-                                    <div className="label">Awake Time</div>
+                                    <div className="label">{t('awakeTime')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {todayStats.woke_up ? todayStats.naps : '--'}
                                     </div>
-                                    <div className="label">Naps</div>
+                                    <div className="label">{t('naps')}</div>
                                 </div>
                             </div>
                         </React.Fragment>
@@ -827,31 +913,31 @@
                     {weeklyStats && (
                         <React.Fragment>
                             <div className="section-divider" />
-                            <div className="section-title">Last 7 Days (avg / day)</div>
+                            <div className="section-title">{t('last7Days')}</div>
                             <div className="stats-grid">
                                 <div className="stat-card">
                                     <div className="value">
                                         {formatDuration(weeklyStats.averages.total_minutes)}
                                     </div>
-                                    <div className="label">Avg Sleep</div>
+                                    <div className="label">{t('avgSleep')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {formatDuration(weeklyStats.averages.night_minutes)}
                                     </div>
-                                    <div className="label">Avg Night</div>
+                                    <div className="label">{t('avgNight')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {formatDuration(weeklyStats.averages.day_minutes)}
                                     </div>
-                                    <div className="label">Avg Day</div>
+                                    <div className="label">{t('avgDay')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
                                         {weeklyStats.averages.naps}
                                     </div>
-                                    <div className="label">Avg Naps</div>
+                                    <div className="label">{t('avgNaps')}</div>
                                 </div>
                             </div>
 
@@ -867,16 +953,16 @@
 
                     <div className="sessions-list">
                         <div className="sessions-header">
-                            <h3>Recent Sessions</h3>
-                            <button className="add-btn" onClick={openAddForm} title="Add session">+</button>
+                            <h3>{t('recentSessions')}</h3>
+                            <button className="add-btn" onClick={openAddForm} title={t('addSession')}>+</button>
                         </div>
                         {sessions.filter(s => s.end_time).map(session => (
                             <div key={session.id} className="session-item">
                                 <div className="session-info">
                                     <div className="session-time">
-                                        {formatDateTimeInTz(session.start_time, timezone.tz)}
+                                        {formatDateTimeInTz(session.start_time, timezone.tz, locale)}
                                         {' \u2192 '}
-                                        {formatDateTimeInTz(session.end_time, timezone.tz)}
+                                        {formatDateTimeInTz(session.end_time, timezone.tz, locale)}
                                     </div>
                                     <div className="session-duration">
                                         {formatDuration(session.duration_minutes)}
@@ -886,17 +972,13 @@
                                     <button
                                         className="edit-btn"
                                         onClick={() => openEditForm(session)}
-                                        title="Edit session"
-                                    >
-                                        {'\u270E'}
-                                    </button>
+                                        title={t('editSession')}
+                                    >{'\u270E'}</button>
                                     <button
                                         className="delete-btn"
                                         onClick={() => handleDeleteSession(session.id)}
-                                        title="Delete session"
-                                    >
-                                        {'\u2715'}
-                                    </button>
+                                        title={t('deleteConfirm')}
+                                    >{'\u2715'}</button>
                                 </div>
                             </div>
                         ))}
@@ -906,10 +988,10 @@
                         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeForm(); }}>
                             <div className="modal-card">
                                 <div className="modal-title">
-                                    {editingSession.id ? 'Edit Session' : 'Add Session'}
+                                    {editingSession.id ? t('editSession') : t('addSession')}
                                 </div>
                                 <div className="form-group">
-                                    <label>Start ({timezone.label})</label>
+                                    <label>{t('start')} ({timezone.label})</label>
                                     <input
                                         type="datetime-local"
                                         value={formStart}
@@ -917,7 +999,7 @@
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>End ({timezone.label})</label>
+                                    <label>{t('end')} ({timezone.label})</label>
                                     <input
                                         type="datetime-local"
                                         value={formEnd}
@@ -925,8 +1007,8 @@
                                     />
                                 </div>
                                 <div className="modal-buttons">
-                                    <button className="modal-btn cancel" onClick={closeForm}>Cancel</button>
-                                    <button className="modal-btn save" onClick={handleSaveSession}>Save</button>
+                                    <button className="modal-btn cancel" onClick={closeForm}>{t('cancel')}</button>
+                                    <button className="modal-btn save" onClick={handleSaveSession}>{t('save')}</button>
                                 </div>
                             </div>
                         </div>

@@ -5,6 +5,8 @@ services:
     environment:
       DB_URI: ${DB_URI:?DB_URI is required}
       NIGHT_START_HOUR: ${NIGHT_START_HOUR:-19}
+      LANGUAGE: ${LANGUAGE:-en}
+      BABY_NAME: ${BABY_NAME:-}
       HA_URL: ${HA_URL:-}
       HA_TOKEN: ${HA_TOKEN:-}
 

@@ -20,6 +20,8 @@ const pool = process.env.DB_URI
 
 // Night starts at this UTC hour (sessions before 07:00 or >= NIGHT_START_HOUR are "night")
 const NIGHT_START_HOUR = parseInt(process.env.NIGHT_START_HOUR || '19');
+const LANGUAGE = process.env.LANGUAGE || 'en';
+const BABY_NAME = process.env.BABY_NAME || '';
 
 // Home Assistant configuration
 const HA_URL = process.env.HA_URL;
@@ -75,6 +77,12 @@ async function migrate() {
       BEFORE INSERT OR UPDATE ON sleep_sessions
       FOR EACH ROW
       EXECUTE FUNCTION calculate_duration();
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   console.log('Database migration complete');
 }
@@ -101,6 +109,40 @@ app.get('/api/health', async (req, res) => {
     res.json({ status: 'ok' });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// App config (from env vars)
+app.get('/api/config', (req, res) => {
+  res.json({ language: LANGUAGE, baby_name: BABY_NAME });
+});
+
+// Persistent settings (stored in DB)
+app.get('/api/settings', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT key, value FROM app_settings');
+    const settings = {};
+    result.rows.forEach(row => { settings[row.key] = row.value; });
+    res.json(settings);
+  } catch (err) {
+    console.error('Error getting settings:', err);
+    res.status(500).json({ error: 'Failed to get settings' });
+  }
+});
+
+app.put('/api/settings/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+    await pool.query(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()
+    `, [key, value]);
+    res.json({ key, value });
+  } catch (err) {
+    console.error('Error saving setting:', err);
+    res.status(500).json({ error: 'Failed to save setting' });
   }
 });
 
@@ -342,6 +384,7 @@ waitForDb()
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Baby Sleep Tracker API running on port ${PORT}`);
       console.log(`Night/day boundary: ${NIGHT_START_HOUR}:00 UTC`);
+      console.log(`Language: ${LANGUAGE}${BABY_NAME ? `, Baby name: ${BABY_NAME}` : ''}`);
       if (HA_URL) {
         console.log(`Home Assistant integration enabled: ${HA_URL}`);
       } else {
