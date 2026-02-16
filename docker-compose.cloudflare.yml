@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DB_URI: ${DB_URI:?DB_URI is required}
+      NIGHT_START_HOUR: ${NIGHT_START_HOUR:-19}
+      LANGUAGE: ${LANGUAGE:-en}
+      BABY_NAME: ${BABY_NAME:-}
+      HA_URL: ${HA_URL:-}
+      HA_TOKEN: ${HA_TOKEN:-}
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - default
+      - cloudflare
+
+networks:
+  cloudflare:
+    external: true
