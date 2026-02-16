@@ -177,13 +177,13 @@ app.post('/api/sleep/start', async (req, res) => {
     if (active.rows.length > 0) {
       return res.status(409).json({ error: 'A sleep session is already active' });
     }
-    const now = new Date().toISOString();
+    const startTime = req.body.start_time || new Date().toISOString();
     const result = await pool.query(
       'INSERT INTO sleep_sessions (start_time) VALUES ($1) RETURNING *',
-      [now]
+      [startTime]
     );
     const session = result.rows[0];
-    await notifyHomeAssistant('sleeping', now, session.id);
+    await notifyHomeAssistant('sleeping', startTime, session.id);
     res.status(201).json(session);
   } catch (err) {
     console.error('Error starting session:', err);
@@ -200,13 +200,13 @@ app.post('/api/sleep/end', async (req, res) => {
     if (active.rows.length === 0) {
       return res.status(404).json({ error: 'No active sleep session found' });
     }
-    const now = new Date().toISOString();
+    const endTime = req.body.end_time || new Date().toISOString();
     const result = await pool.query(
       'UPDATE sleep_sessions SET end_time = $1 WHERE id = $2 RETURNING *',
-      [now, active.rows[0].id]
+      [endTime, active.rows[0].id]
     );
     const session = result.rows[0];
-    await notifyHomeAssistant('awake', now, session.id);
+    await notifyHomeAssistant('awake', endTime, session.id);
     res.json(session);
   } catch (err) {
     console.error('Error ending session:', err);

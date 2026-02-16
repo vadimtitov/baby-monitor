@@ -448,10 +448,12 @@
                 tapToWake: 'Tap to wake',
                 tapToSleep: 'Tap to sleep',
                 today: 'Today',
-                wokeUp: 'Woke Up',
+                lastWakeUp: 'Last Wake Up',
                 daySleep: 'Day Sleep',
                 awakeTime: 'Awake Time',
                 naps: 'Naps',
+                startSleep: 'Start Sleep',
+                endSleep: 'End Sleep',
                 last7Days: 'Last 7 Days (avg / day)',
                 avgSleep: 'Avg Sleep',
                 avgNight: 'Avg Night',
@@ -485,10 +487,12 @@
                 tapToWake: '\u041D\u0430\u0436\u043C\u0438 \u2014 \u043F\u0440\u043E\u0441\u043D\u0443\u043B\u0441\u044F',
                 tapToSleep: '\u041D\u0430\u0436\u043C\u0438 \u2014 \u0443\u0441\u043D\u0443\u043B',
                 today: '\u0421\u0435\u0433\u043E\u0434\u043D\u044F',
-                wokeUp: '\u041F\u043E\u0434\u044A\u0451\u043C',
+                lastWakeUp: '\u041F\u043E\u0441\u043B. \u043F\u043E\u0434\u044A\u0451\u043C',
                 daySleep: '\u0414\u043D\u0435\u0432\u043D\u043E\u0439 \u0441\u043E\u043D',
                 awakeTime: '\u0411\u043E\u0434\u0440\u0441\u0442\u0432\u0443\u0435\u0442',
                 naps: '\u0421\u043D\u044B',
+                startSleep: '\u041D\u0430\u0447\u0430\u0442\u044C \u0441\u043E\u043D',
+                endSleep: '\u0417\u0430\u043A\u043E\u043D\u0447\u0438\u0442\u044C \u0441\u043E\u043D',
                 last7Days: '7 \u0434\u043D\u0435\u0439 (\u0441\u0440\u0435\u0434./\u0434\u0435\u043D\u044C)',
                 avgSleep: '\u0421\u0440\u0435\u0434. \u0441\u043E\u043D',
                 avgNight: '\u0421\u0440\u0435\u0434. \u043D\u043E\u0447\u044C',
@@ -522,10 +526,12 @@
                 tapToWake: 'Toca para despertar',
                 tapToSleep: 'Toca para dormir',
                 today: 'Hoy',
-                wokeUp: 'Despert\u00F3',
+                lastWakeUp: '\u00DAlt. despertar',
                 daySleep: 'Sue\u00F1o diurno',
                 awakeTime: 'Despierto',
                 naps: 'Siestas',
+                startSleep: 'Iniciar sue\u00F1o',
+                endSleep: 'Terminar sue\u00F1o',
                 last7Days: '7 d\u00EDas (prom./d\u00EDa)',
                 avgSleep: 'Prom. sue\u00F1o',
                 avgNight: 'Prom. noche',
@@ -726,6 +732,12 @@
             const [images, setImages] = useState({ sleeping: null, awake: null });
             const sleepingInputRef = useRef(null);
             const awakeInputRef = useRef(null);
+
+            // Long-press modal state
+            const [showAdjust, setShowAdjust] = useState(false);
+            const [adjustTime, setAdjustTime] = useState('');
+            const longPressTimer = useRef(null);
+            const longPressFired = useRef(false);
 
             // Translation helper
             const lang = config.language || 'en';
@@ -988,6 +1000,62 @@
                 }
             };
 
+            // ---- Long press handlers ----
+
+            const handlePressStart = (e) => {
+                longPressFired.current = false;
+                longPressTimer.current = setTimeout(() => {
+                    longPressFired.current = true;
+                    // Pre-fill with current time in timezone
+                    setAdjustTime(utcToLocalStr(new Date().toISOString(), timezone.tz));
+                    setShowAdjust(true);
+                }, 500);
+            };
+
+            const handlePressEnd = (e) => {
+                if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                }
+                if (longPressFired.current) {
+                    e.preventDefault();
+                    longPressFired.current = false;
+                    return;
+                }
+            };
+
+            const handlePressMove = () => {
+                if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                }
+            };
+
+            const handleAdjustedToggle = async () => {
+                try {
+                    setError(null);
+                    const customTimeUTC = localStrToUTC(adjustTime, timezone.tz);
+                    if (currentSession) {
+                        setCurrentSession(null);
+                        await apiFetch('/sleep/end', {
+                            method: 'POST',
+                            body: JSON.stringify({ end_time: customTimeUTC }),
+                        });
+                    } else {
+                        setCurrentSession({ start_time: customTimeUTC });
+                        await apiFetch('/sleep/start', {
+                            method: 'POST',
+                            body: JSON.stringify({ start_time: customTimeUTC }),
+                        });
+                    }
+                    setShowAdjust(false);
+                    await loadData();
+                } catch (err) {
+                    setError(err.message);
+                    await loadData();
+                }
+            };
+
             const handleDeleteSession = async (id) => {
                 if (!confirm(t('deleteConfirm'))) return;
                 try {
@@ -1012,6 +1080,17 @@
             const pageTitle = config.baby_name
                 ? t('titleTpl').replace('{name}', config.baby_name)
                 : t('title');
+
+            // Last wake up: most recent end_time from completed sessions
+            const lastWakeUpTime = sessions.find(s => s.end_time)?.end_time || null;
+
+            // Real-time today stats
+            const realtimeDaySleep = todayStats && todayStats.woke_up
+                ? todayStats.day_sleep_minutes + (isSleeping ? timerMs / 60000 : 0)
+                : null;
+            const realtimeAwake = todayStats && todayStats.woke_up
+                ? Math.max(0, (currentTime - new Date(todayStats.woke_up)) / 60000 - (realtimeDaySleep || 0))
+                : null;
 
             return (
                 <div className="app-container">
@@ -1043,7 +1122,14 @@
                     <div className="sleep-button-container">
                         <button
                             className={`sleep-button ${isSleeping ? 'sleeping' : 'awake'}`}
-                            onClick={handleToggleSleep}
+                            onClick={(e) => { if (!longPressFired.current) handleToggleSleep(); }}
+                            onMouseDown={handlePressStart}
+                            onMouseUp={handlePressEnd}
+                            onMouseLeave={handlePressMove}
+                            onTouchStart={handlePressStart}
+                            onTouchEnd={handlePressEnd}
+                            onTouchMove={handlePressMove}
+                            onContextMenu={(e) => e.preventDefault()}
                         >
                             <span className={`icon ${isSleeping ? 'sleeping-indicator' : ''}`}>
                                 {currentPhoto
@@ -1069,25 +1155,25 @@
                             <div className="stats-grid">
                                 <div className="stat-card">
                                     <div className="value">
-                                        {formatShortTimeInTz(todayStats.woke_up, timezone.tz)}
+                                        {formatShortTimeInTz(lastWakeUpTime, timezone.tz)}
                                     </div>
-                                    <div className="label">{t('wokeUp')}</div>
+                                    <div className="label">{t('lastWakeUp')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
-                                        {todayStats.woke_up ? formatDuration(todayStats.day_sleep_minutes) : '--'}
+                                        {todayStats.woke_up ? formatDuration(realtimeDaySleep) : '--'}
                                     </div>
                                     <div className="label">{t('daySleep')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
-                                        {todayStats.woke_up ? formatDuration(todayStats.awake_minutes) : '--'}
+                                        {todayStats.woke_up ? formatDuration(realtimeAwake) : '--'}
                                     </div>
                                     <div className="label">{t('awakeTime')}</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
-                                        {todayStats.woke_up ? todayStats.naps : '--'}
+                                        {todayStats.woke_up ? todayStats.naps + (isSleeping ? 1 : 0) : '--'}
                                     </div>
                                     <div className="label">{t('naps')}</div>
                                 </div>
@@ -1195,6 +1281,35 @@
                                 <div className="modal-buttons">
                                     <button className="modal-btn cancel" onClick={closeForm}>{t('cancel')}</button>
                                     <button className="modal-btn save" onClick={handleSaveSession}>{t('save')}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Time adjustment modal (long-press) */}
+                    {showAdjust && (
+                        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAdjust(false); }}>
+                            <div className="modal-card">
+                                <div className="modal-title">
+                                    {isSleeping ? t('endSleep') : t('startSleep')}
+                                </div>
+                                <div className="form-group">
+                                    <label>
+                                        {isSleeping ? t('end') : t('start')} ({timezone.label})
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={adjustTime}
+                                        onChange={e => setAdjustTime(e.target.value)}
+                                    />
+                                </div>
+                                <div className="modal-buttons">
+                                    <button className="modal-btn cancel" onClick={() => setShowAdjust(false)}>
+                                        {t('cancel')}
+                                    </button>
+                                    <button className="modal-btn save" onClick={handleAdjustedToggle}>
+                                        {t('save')}
+                                    </button>
                                 </div>
                             </div>
                         </div>
