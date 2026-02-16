@@ -214,6 +214,30 @@ app.post('/api/sleep/end', async (req, res) => {
   }
 });
 
+// Continue (reopen) a completed sleep session
+app.post('/api/sleep/sessions/:id/continue', async (req, res) => {
+  try {
+    const active = await pool.query('SELECT id FROM sleep_sessions WHERE end_time IS NULL');
+    if (active.rows.length > 0) {
+      return res.status(409).json({ error: 'A sleep session is already active' });
+    }
+    const { id } = req.params;
+    const result = await pool.query(
+      'UPDATE sleep_sessions SET end_time = NULL, duration_minutes = NULL WHERE id = $1 RETURNING *',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const session = result.rows[0];
+    await notifyHomeAssistant('sleeping', session.start_time, session.id);
+    res.json(session);
+  } catch (err) {
+    console.error('Error continuing session:', err);
+    res.status(500).json({ error: 'Failed to continue session' });
+  }
+});
+
 // Get sleep sessions with optional filters
 app.get('/api/sleep/sessions', async (req, res) => {
   try {
