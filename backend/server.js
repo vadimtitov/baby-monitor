@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Database configuration — accepts DB_URI or falls back to individual vars
 const pool = process.env.DB_URI
@@ -143,6 +143,17 @@ app.put('/api/settings/:key', async (req, res) => {
   } catch (err) {
     console.error('Error saving setting:', err);
     res.status(500).json({ error: 'Failed to save setting' });
+  }
+});
+
+app.delete('/api/settings/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    await pool.query('DELETE FROM app_settings WHERE key = $1', [key]);
+    res.json({ message: 'Setting deleted' });
+  } catch (err) {
+    console.error('Error deleting setting:', err);
+    res.status(500).json({ error: 'Failed to delete setting' });
   }
 });
 
