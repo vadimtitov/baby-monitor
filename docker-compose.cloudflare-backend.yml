@@ -2,6 +2,8 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    ports:
+      - "${PORT:-3001}:3001"
     environment:
       DB_URI: ${DB_URI:?DB_URI is required}
       NIGHT_START_HOUR: ${NIGHT_START_HOUR:-19}
@@ -10,13 +12,10 @@ services:
       HA_URL: ${HA_URL:-}
       HA_TOKEN: ${HA_TOKEN:-}
       API_TOKEN: ${API_TOKEN:-}
+    networks:
+      - default
+      - cloudflare
 
-  frontend:
-    build: ./frontend
-    restart: unless-stopped
-    ports:
-      - "${PORT:-3000}:80"
-    depends_on:
-      - backend
-    environment:
-      API_TOKEN: ${API_TOKEN:-}
+networks:
+  cloudflare:
+    external: true
