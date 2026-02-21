@@ -9,6 +9,7 @@ services:
       BABY_NAME: ${BABY_NAME:-}
       HA_URL: ${HA_URL:-}
       HA_TOKEN: ${HA_TOKEN:-}
+      API_TOKEN: ${API_TOKEN:-}
 
   frontend:
     build: ./frontend
@@ -17,6 +18,8 @@ services:
       - "${PORT:-3000}:80"
     depends_on:
       - backend
+    environment:
+      API_TOKEN: ${API_TOKEN:-}
     networks:
       - default
       - cloudflare

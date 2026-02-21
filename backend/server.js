@@ -7,6 +7,18 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
+// Bearer token auth — if API_TOKEN is set, all /api requests require it
+const API_TOKEN = process.env.API_TOKEN;
+if (API_TOKEN) {
+  app.use('/api', (req, res, next) => {
+    const auth = req.headers.authorization;
+    if (!auth || auth !== `Bearer ${API_TOKEN}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  });
+}
+
 // Database configuration — accepts DB_URI or falls back to individual vars
 const pool = process.env.DB_URI
   ? new Pool({ connectionString: process.env.DB_URI })
@@ -420,6 +432,7 @@ waitForDb()
       console.log(`Baby Sleep Tracker API running on port ${PORT}`);
       console.log(`Night/day boundary: ${NIGHT_START_HOUR}:00 UTC`);
       console.log(`Language: ${LANGUAGE}${BABY_NAME ? `, Baby name: ${BABY_NAME}` : ''}`);
+      console.log(`API auth: ${API_TOKEN ? 'enabled (Bearer token required)' : 'disabled (no API_TOKEN set)'}`);
       if (HA_URL) {
         console.log(`Home Assistant integration enabled: ${HA_URL}`);
       } else {
