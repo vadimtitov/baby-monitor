@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const fetch = require('node-fetch');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -10,9 +11,12 @@ app.use(express.json({ limit: '2mb' }));
 // Bearer token auth — if API_TOKEN is set, all /api requests require it
 const API_TOKEN = process.env.API_TOKEN;
 if (API_TOKEN) {
+  const expectedBuf = Buffer.from(`Bearer ${API_TOKEN}`);
   app.use('/api', (req, res, next) => {
-    const auth = req.headers.authorization;
-    if (!auth || auth !== `Bearer ${API_TOKEN}`) {
+    const auth = req.headers.authorization || '';
+    const authBuf = Buffer.from(auth);
+    if (authBuf.length !== expectedBuf.length ||
+        !crypto.timingSafeEqual(authBuf, expectedBuf)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
