@@ -344,7 +344,8 @@ app.get('/api/sleep/stats/today', async (req, res) => {
       FROM sleep_sessions
       WHERE end_time IS NOT NULL
         AND start_time > $1
-    `, [wakeUpTime]);
+        AND EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') < $2
+    `, [wakeUpTime, NIGHT_START_HOUR]);
 
     const daySleptMinutes = Math.round(parseFloat(napsResult.rows[0].day_sleep_minutes));
     const naps = parseInt(napsResult.rows[0].naps);

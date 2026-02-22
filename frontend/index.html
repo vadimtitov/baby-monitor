@@ -1226,7 +1226,7 @@
                                 </div>
                                 <div className="stat-card">
                                     <div className="value">
-                                        {todayStats.woke_up ? todayStats.naps + (isSleeping ? 1 : 0) : '--'}
+                                        {todayStats.woke_up ? todayStats.naps + (isSleeping && new Date(currentSession.start_time).getUTCHours() < 19 ? 1 : 0) : '--'}
                                     </div>
                                     <div className="label">{t('naps')}</div>
                                 </div>
