@@ -319,7 +319,7 @@ app.put('/api/sleep/sessions/:id', async (req, res) => {
   }
 });
 
-// Today stats — anchored to morning wake-up (last sleep end between 04:00–12:00 UTC today)
+// Today stats — anchored to morning wake-up (first sleep end between 04:00–12:00 UTC today)
 app.get('/api/sleep/stats/today', async (req, res) => {
   try {
     const wakeUpResult = await pool.query(`
@@ -327,7 +327,7 @@ app.get('/api/sleep/stats/today', async (req, res) => {
       WHERE end_time IS NOT NULL
         AND end_time >= CURRENT_DATE + INTERVAL '4 hours'
         AND end_time <  CURRENT_DATE + INTERVAL '12 hours'
-      ORDER BY end_time DESC
+      ORDER BY end_time ASC
       LIMIT 1
     `);
 
