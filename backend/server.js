@@ -34,8 +34,22 @@ const pool = process.env.DB_URI
       password: process.env.DB_PASSWORD,
     });
 
-// Night starts at this UTC hour (sessions before 07:00 or >= NIGHT_START_HOUR are "night")
-const NIGHT_START_HOUR = parseInt(process.env.NIGHT_START_HOUR || '19');
+// Night starts at this UTC hour (sessions before 07:00 or >= nightStartHour are "night")
+// Default from env var, overridable via PUT /api/settings/night_start_hour
+const DEFAULT_NIGHT_START_HOUR = parseInt(process.env.NIGHT_START_HOUR || '19');
+
+async function getNightStartHour() {
+  try {
+    const result = await pool.query(
+      "SELECT value FROM app_settings WHERE key = 'night_start_hour'"
+    );
+    if (result.rows.length > 0) {
+      const val = parseInt(result.rows[0].value);
+      if (!isNaN(val) && val >= 0 && val <= 23) return val;
+    }
+  } catch (err) {}
+  return DEFAULT_NIGHT_START_HOUR;
+}
 const LANGUAGE = process.env.LANGUAGE || 'en';
 const BABY_NAME = process.env.BABY_NAME || '';
 
@@ -322,6 +336,8 @@ app.put('/api/sleep/sessions/:id', async (req, res) => {
 // Today stats — anchored to morning wake-up (first sleep end between 04:00–12:00 UTC today)
 app.get('/api/sleep/stats/today', async (req, res) => {
   try {
+    const nightStartHour = await getNightStartHour();
+
     const wakeUpResult = await pool.query(`
       SELECT end_time FROM sleep_sessions
       WHERE end_time IS NOT NULL
@@ -332,7 +348,7 @@ app.get('/api/sleep/stats/today', async (req, res) => {
     `);
 
     if (wakeUpResult.rows.length === 0) {
-      return res.json({ woke_up: null, day_sleep_minutes: 0, awake_minutes: 0, naps: 0 });
+      return res.json({ woke_up: null, day_sleep_minutes: 0, awake_minutes: 0, naps: 0, night_start_hour: nightStartHour });
     }
 
     const wakeUpTime = wakeUpResult.rows[0].end_time;
@@ -345,7 +361,7 @@ app.get('/api/sleep/stats/today', async (req, res) => {
       WHERE end_time IS NOT NULL
         AND start_time > $1
         AND EXTRACT(HOUR FROM start_time AT TIME ZONE 'UTC') < $2
-    `, [wakeUpTime, NIGHT_START_HOUR]);
+    `, [wakeUpTime, nightStartHour]);
 
     const daySleptMinutes = Math.round(parseFloat(napsResult.rows[0].day_sleep_minutes));
     const naps = parseInt(napsResult.rows[0].naps);
@@ -354,7 +370,7 @@ app.get('/api/sleep/stats/today', async (req, res) => {
       Math.round((Date.now() - new Date(wakeUpTime).getTime()) / 60000) - daySleptMinutes
     );
 
-    res.json({ woke_up: wakeUpTime, day_sleep_minutes: daySleptMinutes, awake_minutes: awakeMinutes, naps });
+    res.json({ woke_up: wakeUpTime, day_sleep_minutes: daySleptMinutes, awake_minutes: awakeMinutes, naps, night_start_hour: nightStartHour });
   } catch (err) {
     console.error('Error getting today stats:', err);
     res.status(500).json({ error: 'Failed to get today stats' });
@@ -364,6 +380,8 @@ app.get('/api/sleep/stats/today', async (req, res) => {
 // Weekly stats — last 7 days, split by day/night
 app.get('/api/sleep/stats/weekly', async (req, res) => {
   try {
+    const nightStartHour = await getNightStartHour();
+
     const result = await pool.query(`
       SELECT
         DATE(start_time AT TIME ZONE 'UTC') as day,
@@ -385,7 +403,7 @@ app.get('/api/sleep/stats/weekly', async (req, res) => {
         AND start_time >= NOW() - INTERVAL '7 days'
       GROUP BY DATE(start_time AT TIME ZONE 'UTC')
       ORDER BY day
-    `, [NIGHT_START_HOUR]);
+    `, [nightStartHour]);
 
     const days = result.rows;
     const n = Math.max(days.length, 1);
@@ -435,7 +453,7 @@ waitForDb()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Baby Sleep Tracker API running on port ${PORT}`);
-      console.log(`Night/day boundary: ${NIGHT_START_HOUR}:00 UTC`);
+      console.log(`Night/day boundary (default): ${DEFAULT_NIGHT_START_HOUR}:00 UTC (overridable via PUT /api/settings/night_start_hour)`);
       console.log(`Language: ${LANGUAGE}${BABY_NAME ? `, Baby name: ${BABY_NAME}` : ''}`);
       console.log(`API auth: ${API_TOKEN ? 'enabled (Bearer token required)' : 'disabled (no API_TOKEN set)'}`);
       if (HA_URL) {
