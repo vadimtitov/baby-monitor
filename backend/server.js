@@ -319,12 +319,18 @@ app.put('/api/sleep/sessions/:id', async (req, res) => {
     if (new Date(end_time) <= new Date(start_time)) {
       return res.status(400).json({ error: 'end_time must be after start_time' });
     }
+    const current = await pool.query('SELECT * FROM sleep_sessions WHERE id = $1', [id]);
+    const wasActive = current.rows.length > 0 && !current.rows[0].end_time;
+
     const result = await pool.query(
       'UPDATE sleep_sessions SET start_time = $1, end_time = $2 WHERE id = $3 RETURNING *',
       [start_time, end_time, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
+    }
+    if (wasActive) {
+      await notifyHomeAssistant('awake', end_time, parseInt(id));
     }
     res.json(result.rows[0]);
   } catch (err) {
@@ -437,6 +443,9 @@ app.delete('/api/sleep/sessions/:id', async (req, res) => {
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
+    }
+    if (!result.rows[0].end_time) {
+      await notifyHomeAssistant('awake', new Date().toISOString(), parseInt(id));
     }
     res.json({ message: 'Session deleted', session: result.rows[0] });
   } catch (err) {
